@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef } from 'react'
 import { useApp } from '../app/state'
 
 const DEBOUNCE_MS = 250
@@ -8,19 +8,23 @@ const DEBOUNCE_MS = 250
 // allow_shed: DEFAULTS TO TRUE, matching RemoveNode and the engine default, so the LP stays feasible and the
 // user sees shed MW. The checkbox lets users turn shedding off, which is the only way to reach the genuine
 // infeasible diagnostic (e.g. line 9 at 0.25x, public/data/scenarios/infeasible.json) through this control.
+//
+// Architecture-stabilization pass: {factor, allowShed} now live in shared AppState.capDraft (selectedLine
+// was already shared), so a second mount (home chapter 3 + chapter 6's laboratory) shows the identical
+// draft rather than its own stale copy. The debounce timer and `awaitingOwnLine` stay instance-local
+// (refs can't be shared state, and don't need to be: whichever mounted instance the user is actually
+// interacting with owns firing the debounced Worker call; the shared draft value means both instances
+// display the same thing regardless of which one is doing the firing).
 export function AlterCapacity() {
   const { state, dispatch, setCapacity } = useApp()
-  const { network, result, baseline, selectedLine, lineCapacity, pending, solve, solveError } = state
+  const { network, result, baseline, selectedLine, lineCapacity, pending, solve, solveError, capDraft } = state
   // N2 fix: prefer the in-flight scenario's capacity over the last-confirmed one when re-syncing the
   // slider, so re-selecting a line whose change is still solving shows what's actually been requested,
   // not a stale pre-change value that then silently becomes the base for the next edit.
   const effectiveCapacity = pending?.lineCapacity ?? lineCapacity
   const effectiveAllowShed = pending?.allowShed ?? state.allowShed
-  const [factor, setFactor] = useState(1)
-  // Local draft, for immediate UI feedback rather than waiting out the 250ms debounce -- same reasoning
-  // as `factor`, and resynced on the exact same occasions (line change, reset, pending resolution) from
-  // effectiveAllowShed rather than from the last-confirmed value alone (N1/N2's same staleness class).
-  const [allowShed, setAllowShed] = useState(true)
+  const { factor, allowShed } = capDraft
+  const headingId = useId()
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   // The debounce timer schedules its call 250ms in the future; if it captured
   // `setCapacity` directly, a removal confirmed during that window would still
@@ -41,8 +45,7 @@ export function AlterCapacity() {
   // stale resync), reached through this effect instead of request construction.
   const resync = (sel: number | null) => {
     clearTimeout(timer.current)
-    setFactor(sel === null ? 1 : effectiveCapacity[sel] ?? 1)
-    setAllowShed(effectiveAllowShed)
+    dispatch({ type: 'setCapDraft', factor: sel === null ? 1 : effectiveCapacity[sel] ?? 1, allowShed: effectiveAllowShed })
   }
   const wasAtBaseline = useRef(atBaseline)
   useEffect(() => {
@@ -86,8 +89,8 @@ export function AlterCapacity() {
     }
   }
   return (
-    <section aria-labelledby="ac-h">
-      <h2 id="ac-h">Alter line capacity</h2>
+    <section aria-labelledby={headingId}>
+      <h2 id={headingId}>Alter line capacity</h2>
       <label>Line{' '}
         <select value={selectedLine ?? ''} onChange={e => dispatch({ type: 'selectLine', line: e.target.value === '' ? null : +e.target.value })}>
           <option value="">Select a line</option>
@@ -99,11 +102,11 @@ export function AlterCapacity() {
           <label>Capacity factor{' '}
             <input type="range" min={0.1} max={2} step={0.05} value={factor}
               aria-valuetext={`${factor.toFixed(2)}x, ${(line.rating_mw * factor).toFixed(1)} MW`}
-              onChange={e => { setFactor(+e.target.value); fire(+e.target.value, allowShed) }} />
+              onChange={e => { dispatch({ type: 'setCapDraft', factor: +e.target.value, allowShed }); fire(+e.target.value, allowShed) }} />
           </label>
           <output data-testid="cap-factor">{factor.toFixed(2)}x</output>{' '}
           <span data-testid="cap-rating">{(line.rating_mw * factor).toFixed(1)} MW rating</span>
-          <label><input type="checkbox" checked={allowShed} onChange={e => { setAllowShed(e.target.checked); fire(factor, e.target.checked) }} /> Allow load shedding</label>
+          <label><input type="checkbox" checked={allowShed} onChange={e => { dispatch({ type: 'setCapDraft', factor, allowShed: e.target.checked }); fire(factor, e.target.checked) }} /> Allow load shedding</label>
         </div>
       )}
       {solving && <p role="status">Solving DC-OPF in Worker...</p>}

@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useId, useMemo } from 'react'
 import type { CandidateLine } from '../engine/dcopf'
 import type { Case30, SolveResult } from '../engine/types'
 
@@ -100,6 +100,7 @@ function busBrackets(key: string) {
 
 interface Props { network: Case30; result: SolveResult; removedBus?: number | null; selectedBus?: number | null; onSelect?: (bus: number) => void; selectedLine?: number | null; onSelectLine?: (line: number) => void; alteredLines?: number[]; disabledLines?: number[]; onRestoreLine?: (line: number) => void; candidates?: CandidateLine[]; addedLines?: number[]; onToggleCandidate?: (pos: number) => void }
 export function NetworkView({ network, result, removedBus = null, selectedBus = null, onSelect, selectedLine = null, onSelectLine, alteredLines = [], disabledLines = [], onRestoreLine, candidates = [], addedLines = [], onToggleCandidate }: Props) {
+  const reactId = useId()
   // D2: when infeasible, result.flows/shed/islands are all empty (there is no dispatch), so the old code
   // fell through to "no flow -> grey, not shed -> served", rendering a network that looks fully healthy.
   // Every line/bus gets an explicit infeasible treatment instead -- never derived from an empty flows/shed
@@ -143,6 +144,14 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
     return out
   }, [network, result, removedBus, disabledLines, candidates, addedLines, infeasible, noGen, pos, maxFlow])
 
+  // Unique per mount: docs/ART_DIRECTION.md puts a locator inset (chapter 3) and small-multiple mini
+  // networks (chapter 5) alongside the main stage, i.e. more than one <svg> with this filter on the
+  // page at once. A hardcoded id="copper-bloom" would make every url(#copper-bloom) resolve to
+  // whichever <filter> happens to be first in the DOM, silently breaking the glow on every other
+  // instance. Flagged by advisor review before it could become a real multi-SVG bug.
+  // useId() output contains colons (e.g. ":r1:"), which are valid in SVG ids but unsafe inside a CSS
+  // url(#...) reference in some browsers -- stripped here rather than relying on every consumer to know this.
+  const filterId = `copper-bloom-${reactId.replace(/:/g, '')}`
   return (
     // role="group", not role="img": this SVG contains focusable interactive descendants (every bus and
     // line), and role="img" tells assistive tech to treat the whole subtree as a flat, non-interactive
@@ -155,7 +164,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
       <defs>
         {/* glow.filter: "copper-bloom", exact primitives from DESIGN_SYSTEM.json. Region bounded to
             the network bbox plus 8px (glow.filter.filterUnits). Never applied to text/background/legend. */}
-        <filter id="copper-bloom" x={-8} y={-8} width={W + 16} height={H + 16} filterUnits="userSpaceOnUse">
+        <filter id={filterId} x={-8} y={-8} width={W + 16} height={H + 16} filterUnits="userSpaceOnUse">
           <feGaussianBlur in="SourceGraphic" stdDeviation={2.5} result="blur" />
           <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 0.65 0 0 0  0 0 0.35 0 0  0 0 0 0.55 0" result="tint" />
           <feMerge>
@@ -167,7 +176,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
       {/* zOrder: network-glow sits under network-core. Duplicated strokes only, no testids, no
           pointer events -- the interactive strokes below remain the only hit targets. */}
       {glowLines.length > 0 && (
-        <g filter="url(#copper-bloom)" aria-hidden="true" pointerEvents="none">
+        <g filter={`url(#${filterId})`} aria-hidden="true" pointerEvents="none">
           {glowLines.map((gl, i) => <line key={i} x1={gl.x1} y1={gl.y1} x2={gl.x2} y2={gl.y2} stroke={gl.stroke} strokeWidth={gl.width} strokeLinecap="round" />)}
         </g>
       )}

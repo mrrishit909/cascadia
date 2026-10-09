@@ -178,8 +178,14 @@ test("Reset restores load/generator/outage controls to baseline and clears their
   await expect(page.getByTestId("load-unserved")).toBeVisible();
   await page.getByRole("button", { name: "Reset to baseline" }).focus();
   await page.keyboard.press("Enter");
-  // the resynced draft (N2 class) must show baseline (1.00x), not the pre-reset value
-  await expect(page.getByTestId("load-factor")).toHaveText("1.00x");
+  // Architecture-stabilization pass: reset now clears the bus SELECTION too (shared AppState.loadDraft
+  // -> {bus: null, f: 1}), not just the slider's value as it did when bus/f were local component state
+  // -- a deliberate behavior change (full reset == start fresh), not a regression: a stale selection
+  // left showing a draft value after reset would be the exact N2 bug class this test exists to catch,
+  // and "no selection at all" is a strictly stronger guarantee against that than "selection kept, value
+  // resynced" was.
+  await expect(page.locator('section:has-text("Increase load") select')).toHaveValue("");
+  await expect(page.getByTestId("load-factor")).toHaveCount(0);
   await expect(page.getByTestId("load-unserved")).toHaveText("0.00 MW");
 });
 
@@ -278,11 +284,15 @@ test("reset during an active generator solve restores Pmax to rated", async ({ p
   await expect(page.getByRole("button", { name: "Apply limit" })).toBeDisabled();
   await page.getByRole("button", { name: "Reset to baseline" }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByTestId("gen-pmax")).toHaveText("80 MW"); // rated value for gen 0
+  // Architecture-stabilization pass: reset now clears the generator SELECTION too (shared
+  // AppState.genDraft -> {gen: null, mw: 0}), not just the slider's value -- see the matching note on
+  // the "Reset restores..." test above for why this is a deliberate, stronger guarantee, not a regression.
+  await expect(page.locator('section:has-text("Reduce generator") select')).toHaveValue("");
+  await expect(page.getByTestId("gen-pmax")).toHaveCount(0);
   await expect(page.getByTestId("gen-unserved")).toHaveText("0.00 MW");
   // the stale 1.5s generator solve must not silently override the reset once it resolves
   await page.waitForTimeout(2000);
-  await expect(page.getByTestId("gen-pmax")).toHaveText("80 MW");
+  await expect(page.locator('section:has-text("Reduce generator") select')).toHaveValue("");
   await expect(page.getByTestId("gen-unserved")).toHaveText("0.00 MW");
 });
 

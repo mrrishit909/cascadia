@@ -66,6 +66,19 @@ export interface AppState {
   candidates: CandidateLine[] // CAS-INT-004 candidate lines, fetched once at init
   selectedLine: number | null
   pending: Scen | null // scenario intent of the in-flight solve, if any
+  // Architecture-stabilization pass: draft (not-yet-applied) selection/value state for the 4 controls
+  // whose home chapter AND chapter 6's laboratory both need to show the SAME draft, not two
+  // independently-stale ones. Previously local useState per component -- fine for a single mount, but
+  // a second mount would show whatever it last had, diverging from the first the moment either one
+  // changed. Setting selection+value together in one action (rather than a select's onChange handler
+  // dispatching one action and a resync effect dispatching another, slightly later, one) also removes
+  // the root cause of the select-then-slider race found and fixed in ReduceGenerator/IncreaseLoad
+  // earlier: there is no longer a window between "selection changed" and "draft value caught up"
+  // for an interleaved event to land in.
+  loadDraft: { bus: number | null; f: number }
+  genDraft: { gen: number | null; mw: number }
+  capDraft: { factor: number; allowShed: boolean } // selectedLine (above) is AlterCapacity's selection
+  outageLine: number | null // LineOutage's own selection, deliberately separate from selectedLine
   // CAS-INT-006, lifted here (architecture-stabilization pass) so every mounted CompareRestoration
   // instance -- its home chapter 5 AND chapter 6's laboratory -- shares one ranking result and one
   // Worker, rather than each mount owning its own local state/client. Deliberately NOT part of Scen/
@@ -99,8 +112,12 @@ export type Action =
   | { type: 'restorationDone'; ranking: RestoreSeq[] }
   | { type: 'restorationError'; error: string }
   | { type: 'restorationChoose'; index: number }
+  | { type: 'setLoadDraft'; bus: number | null; f: number }
+  | { type: 'setGenDraft'; gen: number | null; mw: number }
+  | { type: 'setCapDraft'; factor: number; allowShed: boolean }
+  | { type: 'setOutageLine'; line: number | null }
 
-const initial: AppState = { load: 'loading', removedBus: null, selectedBus: null, solve: 'idle', lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], addedLines: [], candidates: [], selectedLine: null, pending: null, epoch: 0, restoration: { presetId: '', status: 'idle', chosen: 0 } }
+const initial: AppState = { load: 'loading', removedBus: null, selectedBus: null, solve: 'idle', lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], addedLines: [], candidates: [], selectedLine: null, pending: null, epoch: 0, restoration: { presetId: '', status: 'idle', chosen: 0 }, loadDraft: { bus: null, f: 1 }, genDraft: { gen: null, mw: 0 }, capDraft: { factor: 1, allowShed: true }, outageLine: null }
 
 function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
@@ -111,7 +128,11 @@ function reducer(s: AppState, a: Action): AppState {
     case 'select': return { ...s, selectedBus: a.bus }
     case 'solving': return { ...s, solve: 'solving', solveError: undefined, pending: a.scenario }
     case 'solveFailed': return { ...s, solve: 'error', solveError: a.error, pending: null }
-    case 'reset': return { ...s, result: s.baseline, removedBus: null, lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], addedLines: [], selectedLine: null, selectedBus: null, solve: 'idle', solveError: undefined, pending: null, epoch: s.epoch + 1 }
+    case 'reset': return { ...s, result: s.baseline, removedBus: null, lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], addedLines: [], selectedLine: null, selectedBus: null, solve: 'idle', solveError: undefined, pending: null, epoch: s.epoch + 1, loadDraft: { bus: null, f: 1 }, genDraft: { gen: null, mw: 0 }, capDraft: { factor: 1, allowShed: true }, outageLine: null }
+    case 'setLoadDraft': return { ...s, loadDraft: { bus: a.bus, f: a.f } }
+    case 'setGenDraft': return { ...s, genDraft: { gen: a.gen, mw: a.mw } }
+    case 'setCapDraft': return { ...s, capDraft: { factor: a.factor, allowShed: a.allowShed } }
+    case 'setOutageLine': return { ...s, outageLine: a.line }
     case 'restorationPreset': return { ...s, restoration: { presetId: a.presetId, status: 'idle', chosen: 0 } }
     case 'restorationLoading': return { ...s, restoration: { ...s.restoration, status: 'loading', error: undefined, ranking: undefined, chosen: 0 } }
     case 'restorationDone': return { ...s, restoration: { ...s.restoration, status: 'idle', ranking: a.ranking, chosen: 0 } }

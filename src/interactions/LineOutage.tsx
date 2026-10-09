@@ -1,14 +1,18 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useApp } from '../app/state'
 import { ScenarioReadout } from './ScenarioReadout'
 
 // CAS-INT-007 (P1). Pick a line, Disable -> Confirm/Cancel (Escape cancels) -> Worker solve (disabled_lines).
 // Distinct from capacity (line stays in topology) and bus removal. Restore re-enables a disabled line.
+//
+// Architecture-stabilization pass: line selection now lives in shared AppState.outageLine (so a second
+// mount shows the same selection); `confirming` stays local/transient per instance, since a confirm
+// dialog mid-flow in one mounted instance has no meaningful "same state" in another.
 export function LineOutage() {
-  const { state, setLineOutage } = useApp()
-  const { network, disabledLines, pending, solve, result } = state
-  const [line, setLine] = useState<number | null>(null)
+  const { state, dispatch, setLineOutage } = useApp()
+  const { network, disabledLines, pending, solve, result, outageLine: line } = state
   const [confirming, setConfirming] = useState(false)
+  const headingId = useId()
   const confirmRef = useRef<HTMLButtonElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   // Without this, whichever button triggered a `confirming` transition unmounts and the browser drops
@@ -38,10 +42,10 @@ export function LineOutage() {
   const out = line !== null && off.includes(line)
   const islands = result?.result.islands.length ?? 0
   return (
-    <section aria-labelledby="lo-h" onKeyDown={e => { if (e.key === 'Escape') setConfirming(false) }}>
-      <h2 id="lo-h">Line outage</h2>
+    <section aria-labelledby={headingId} onKeyDown={e => { if (e.key === 'Escape') setConfirming(false) }}>
+      <h2 id={headingId}>Line outage</h2>
       <label>Line to disable{' '}
-        <select value={line ?? ''} disabled={solve === 'solving'} onChange={e => { setConfirming(false); setLine(e.target.value === '' ? null : +e.target.value) }}>
+        <select value={line ?? ''} disabled={solve === 'solving'} onChange={e => { setConfirming(false); dispatch({ type: 'setOutageLine', line: e.target.value === '' ? null : +e.target.value }) }}>
           <option value="">Select a line</option>
           {network.lines.map(l => <option key={l.idx} value={l.idx}>Line {l.idx} ({network.buses[l.from_bus].name}-{network.buses[l.to_bus].name}){off.includes(l.idx) ? ' - OUT' : ''}</option>)}
         </select>
