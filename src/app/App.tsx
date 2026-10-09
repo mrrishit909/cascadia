@@ -5,6 +5,7 @@ import { IncreaseLoad } from '../interactions/IncreaseLoad'
 import { ReduceGenerator } from '../interactions/ReduceGenerator'
 import { LineOutage } from '../interactions/LineOutage'
 import { AddLine } from '../interactions/AddLine'
+import { CompareRestoration } from '../interactions/CompareRestoration'
 import { NetworkView } from '../visualization/NetworkView'
 
 export function Scene() {
@@ -30,6 +31,7 @@ export function Scene() {
       <ReduceGenerator />
       <LineOutage />
       <AddLine />
+      <CompareRestoration />
       <p className="provenance">{state.result.label}</p>
     </main>
   )
