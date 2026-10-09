@@ -11,8 +11,8 @@ function project(network: Case30) {
   return network.buses.map(b => ({ x: PAD + (b.x - x0) * k, y: H - PAD - (b.y - y0) * k }))
 }
 
-interface Props { network: Case30; result: SolveResult; removedBus?: number | null; selectedBus?: number | null; onSelect?: (bus: number) => void; selectedLine?: number | null; onSelectLine?: (line: number) => void; alteredLines?: number[] }
-export function NetworkView({ network, result, removedBus = null, selectedBus = null, onSelect, selectedLine = null, onSelectLine, alteredLines = [] }: Props) {
+interface Props { network: Case30; result: SolveResult; removedBus?: number | null; selectedBus?: number | null; onSelect?: (bus: number) => void; selectedLine?: number | null; onSelectLine?: (line: number) => void; alteredLines?: number[]; disabledLines?: number[] }
+export function NetworkView({ network, result, removedBus = null, selectedBus = null, onSelect, selectedLine = null, onSelectLine, alteredLines = [], disabledLines = [] }: Props) {
   // D2: when infeasible, result.flows/shed/islands are all empty (there is no dispatch), so the old code
   // fell through to "no flow -> grey, not shed -> served", rendering a network that looks fully healthy.
   // Every line/bus gets an explicit infeasible treatment instead -- never derived from an empty flows/shed
@@ -29,7 +29,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
       <g>
         {network.lines.map(l => {
           const a = pos[l.from_bus], b = pos[l.to_bus]
-          const dead = l.from_bus === removedBus || l.to_bus === removedBus
+          const dead = l.from_bus === removedBus || l.to_bus === removedBus || disabledLines.includes(l.idx)
           if (dead) return <line key={l.idx} data-testid="line" data-line={l.idx} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#E0645A" strokeWidth={1} strokeDasharray="1 5" opacity={0.6} />
           if (infeasible) return <g key={l.idx} data-testid="line" data-line={l.idx} data-binding="n/a" data-altered={alteredLines.includes(l.idx)}
             role="button" tabIndex={0} aria-pressed={selectedLine === l.idx} style={{ cursor: 'pointer' }}

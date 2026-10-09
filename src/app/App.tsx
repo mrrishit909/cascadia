@@ -1,6 +1,9 @@
 import { AppProvider, useApp } from './state'
 import { RemoveNode } from '../interactions/RemoveNode'
 import { AlterCapacity } from '../interactions/AlterCapacity'
+import { IncreaseLoad } from '../interactions/IncreaseLoad'
+import { ReduceGenerator } from '../interactions/ReduceGenerator'
+import { LineOutage } from '../interactions/LineOutage'
 import { NetworkView } from '../visualization/NetworkView'
 
 export function Scene() {
@@ -13,9 +16,12 @@ export function Scene() {
       <NetworkView network={state.network} result={state.result.result} removedBus={state.removedBus}
         selectedBus={state.selectedBus} onSelect={bus => dispatch({ type: 'select', bus })}
         selectedLine={state.selectedLine} onSelectLine={line => dispatch({ type: 'selectLine', line })}
-        alteredLines={Object.keys(state.lineCapacity).map(Number)} />
+        alteredLines={Object.keys(state.lineCapacity).map(Number)} disabledLines={state.disabledLines} />
       <RemoveNode />
       <AlterCapacity />
+      <IncreaseLoad />
+      <ReduceGenerator />
+      <LineOutage />
       <p className="provenance">{state.result.label}</p>
     </main>
   )

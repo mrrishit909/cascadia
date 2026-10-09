@@ -6,10 +6,16 @@ Scenario (all optional):
   disabled_lines: [idx]           line outage
   gen_pmax_mw: {idx: MW}          override generator Pmax
   load_scale: {bus: f}            scale load at a bus
+  added_lines: [k]                SYNTHETIC candidate lines (public/data/raw-metadata/candidate_lines.json, idx 41+k) added to topology
   allow_shed: bool (True)         False -> shed forced to 0, so an unservable island is reported 'infeasible'
 Model assumptions: VOLL = 1000 EUR/MWh (ASSUMED, not in IEEE data); generator quadratics piecewise-linearised
 into N_SEG equal-width secant segments (convex, so merit-order filling is automatic); lossless DC; no Q/voltage.
 """
+import json
+import pathlib
+from functools import cmp_to_key
+from itertools import permutations
+
 import networkx as nx
 import numpy as np
 from scipy.optimize import linprog
@@ -17,9 +23,15 @@ from scipy.optimize import linprog
 VOLL = 1000.0
 N_SEG = 4
 TOL = 1e-6
+MAX_RESTORE = 5  # k<=5 down elements -> <=120 orders, all enumerated
+CAND_PATH = pathlib.Path(__file__).resolve().parents[2] / "public/data/raw-metadata/candidate_lines.json"
 
 
-def _validate(case, sc):
+def load_candidates():
+    return json.load(open(CAND_PATH))["lines"]
+
+
+def _validate(case, sc, cands=()):
     nb, nl, ng = len(case["buses"]), len(case["lines"]), len(case["gens"])
     for b in sc.get("removed_buses", []):
         if not (isinstance(b, int) and 0 <= b < nb): raise ValueError(f"invalid bus {b}")
@@ -34,7 +46,9 @@ def _validate(case, sc):
     for k, f in sc.get("load_scale", {}).items():
         if not 0 <= int(k) < nb: raise ValueError(f"invalid bus {k}")
         if not (np.isfinite(f) and f >= 0): raise ValueError(f"invalid load scale {f}")
-    for l in case["lines"]:
+    for k in sc.get("added_lines", []):
+        if not (isinstance(k, int) and 0 <= k < len(cands)): raise ValueError(f"invalid candidate line {k}")
+    for l in list(case["lines"]) + list(cands):
         if not l["x_pu"] > 0: raise ValueError("non-positive reactance")
 
 
@@ -97,13 +111,20 @@ def _solve_island(case, buses, lines, gens, load, pmax, rating, allow_shed):
                 balance=float(sum(gen.values()) - (d.sum() - sum(shed.values()))))
 
 
-def solve(case, sc=None):
+def solve(case, sc=None, candidates=None):
     sc = sc or {}
-    _validate(case, sc)
+    if sc.get("added_lines") and candidates is None: candidates = load_candidates()
+    candidates = candidates or []
+    _validate(case, sc, candidates)
+    added = set(sc.get("added_lines", []))
+    n0 = len(case["lines"])
+    if added:  # unadded candidates are appended as disabled lines so indices stay list positions
+        case = {**case, "lines": list(case["lines"]) + [dict(c, idx=n0 + k) for k, c in enumerate(candidates)]}
     removed = set(sc.get("removed_buses", []))
     allow_shed = sc.get("allow_shed", True)
     cf = {int(k): v for k, v in sc.get("line_capacity_factor", {}).items()}
     off = set(int(k) for k in sc.get("disabled_lines", []))
+    if added: off |= {n0 + k for k in range(len(candidates)) if k not in added}
     pmax = {g["idx"]: g["pmax_mw"] for g in case["gens"]}
     pmax.update({int(k): v for k, v in sc.get("gen_pmax_mw", {}).items()})
     ls = {int(k): v for k, v in sc.get("load_scale", {}).items()}
@@ -154,9 +175,64 @@ def solve(case, sc=None):
     for g in case["gens"]:
         out["gen"].setdefault(g["idx"], 0.0)
     out["binding_lines"] = sorted(li for li, f in out["flows"].items() if rating[li] > 0 and abs(f) >= rating[li] - 1e-6)
-    out["line_rating_mw"] = rating
+    out["line_rating_mw"] = {i: v for i, v in rating.items() if i not in off or i < n0}
     out.update(objective=obj, unserved_removed_mw=unserved_removed, shed_no_generation_mw=shed_noGen,
                shed_economic_mw=shed_econ, total_unserved_mw=unserved_removed + shed_noGen + shed_econ,
                total_load_mw=sum(load.values()),
                model=dict(voll_eur_per_mwh=VOLL, cost_segments=N_SEG, solver="scipy.linprog/highs"))
     return out
+
+
+# ---- CAS-INT-006: restoration sequencing ---------------------------------------------------------
+# Element = {"kind": "bus"|"line", "id": int}. 'down' elements are removed buses / disabled lines on top of base scenario `base`.
+# METRIC (design decision): served_mw_steps = sum_{i=0}^{k-1} served(state after i restorations), served = total_load - total_unserved.
+# Each restoration action is assumed to take one equal time step (no crew/duration data exists -> labeled assumption), so this is the
+# discrete integral of served power over the time spent in each degraded state, in MW*steps (NOT MWh). The final all-restored state
+# is identical for every order, so it adds a constant and is excluded from the sum (reported separately). Higher is better; ties
+# (within 1e-6) are broken by lexicographic order of the element sequence so rankings are deterministic across languages.
+# All k! orders are enumerated (k<=5). Solves are memoised by restored-subset (2^k <= 32 solves).
+
+def _restore_state(base, down, restored):
+    sc = dict(base)
+    sc["removed_buses"] = sorted(set(base.get("removed_buses", [])) | {e["id"] for i, e in enumerate(down) if e["kind"] == "bus" and i not in restored})
+    sc["disabled_lines"] = sorted(set(base.get("disabled_lines", [])) | {e["id"] for i, e in enumerate(down) if e["kind"] == "line" and i not in restored})
+    return sc
+
+
+def restoration_orders(k):
+    if not 0 <= k <= MAX_RESTORE: raise ValueError(f"at most {MAX_RESTORE} down elements supported, got {k}")
+    return [list(p) for p in permutations(range(k))]
+
+
+def restoration_sequence(case, down, order, base=None, candidates=None, _cache=None):
+    """order: permutation of range(len(down)) (indices into `down`). Returns per-step served MW and the metric."""
+    base = base or {}
+    k = len(down)
+    if sorted(order) != list(range(k)): raise ValueError("order must be a permutation of down-element indices")
+    for e in down:
+        if e["kind"] not in ("bus", "line"): raise ValueError(f"invalid element kind {e['kind']}")
+    cache = {} if _cache is None else _cache
+    steps = []
+    for i in range(k + 1):
+        key = frozenset(order[:i])
+        if key not in cache:
+            r = solve(case, _restore_state(base, down, key), candidates)
+            cache[key] = dict(served_mw=r["total_load_mw"] - r["total_unserved_mw"], unserved_mw=r["total_unserved_mw"], status=r["status"])
+        steps.append(dict(step=i, restored=[order[i - 1]] if i else [], **cache[key]))
+    return dict(order=list(order), steps=steps, served_mw_steps=sum(s["served_mw"] for s in steps[:k]), final_served_mw=steps[-1]["served_mw"])
+
+
+def rank_restoration(case, down, orders=None, base=None, candidates=None):
+    """Rank candidate orders (default: all k!) best-first by served_mw_steps; adds 'rank' (1-based, ties share rank)."""
+    orders = restoration_orders(len(down)) if orders is None else orders
+    if len(orders) < 1: raise ValueError("need at least one order")
+    cache = {}
+    res = [restoration_sequence(case, down, o, base, candidates, cache) for o in orders]
+    def cmp(a, b):
+        d = b["served_mw_steps"] - a["served_mw_steps"]
+        if abs(d) > 1e-6: return -1 if d < 0 else 1
+        return -1 if a["order"] < b["order"] else (1 if a["order"] > b["order"] else 0)
+    res.sort(key=cmp_to_key(cmp))
+    for i, r in enumerate(res):
+        r["rank"] = 1 if i == 0 else (res[i - 1]["rank"] if abs(res[i - 1]["served_mw_steps"] - r["served_mw_steps"]) <= 1e-6 else i + 1)
+    return res

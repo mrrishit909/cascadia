@@ -29,8 +29,8 @@ requirements:
     behavior: "increase load"
     owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
     verification: ["unit:n1_parity_sweep", "e2e:cas_load_increase"]
-    status: unstarted
-    evidence_paths: []
+    status: implemented
+    evidence_paths: ["src/app/newControls.test.tsx"]
   - id: CAS-INT-003
     project: "CASCADIA"
     priority: P0
@@ -41,8 +41,8 @@ requirements:
     behavior: "reduce generator"
     owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
     verification: ["unit:n1_parity_sweep", "e2e:cas_generator_reduce"]
-    status: unstarted
-    evidence_paths: []
+    status: implemented
+    evidence_paths: ["src/app/newControls.test.tsx"]
   - id: CAS-INT-004
     project: "CASCADIA"
     priority: P0
@@ -90,8 +90,8 @@ requirements:
     behavior: "line outage"
     owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
     verification: ["unit:island_balance", "e2e:cas_line_outage"]
-    status: unstarted
-    evidence_paths: []
+    status: implemented
+    evidence_paths: ["src/app/newControls.test.tsx"]
 
   # --- Acceptance gates (source of truth: the Atlas's own executable contract table) ---
   - id: CAS-DATA-001

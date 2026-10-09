@@ -1,0 +1,330 @@
+{
+ "meta": {
+  "n_add": 24,
+  "n_restoration": 4,
+  "passed": 28,
+  "tol_rel": 0.001,
+  "tol_balance_mw": 0.000001,
+  "note": "restoration: ranking order and ranks must match exactly; served values within tol_rel"
+ },
+ "add_line": [
+  {
+   "case_id": "add_0_healthy",
+   "python_objective": 566.8693625,
+   "ts_objective": 566.8693624999999,
+   "objective_delta_relative": 2.0055209408431565e-16,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_1_healthy",
+   "python_objective": 566.8693625,
+   "ts_objective": 566.8693624999999,
+   "objective_delta_relative": 2.0055209408431565e-16,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_2_healthy",
+   "python_objective": 566.8693625,
+   "ts_objective": 566.8693624999999,
+   "objective_delta_relative": 2.0055209408431565e-16,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_3_healthy",
+   "python_objective": 566.8693625,
+   "ts_objective": 566.8693624999999,
+   "objective_delta_relative": 2.0055209408431565e-16,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_4_healthy",
+   "python_objective": 566.8693625,
+   "ts_objective": 566.8693624999999,
+   "objective_delta_relative": 2.0055209408431565e-16,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_all_healthy",
+   "python_objective": 566.8693625,
+   "ts_objective": 566.8693624999999,
+   "objective_delta_relative": 2.0055209408431565e-16,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_0_line9_cap_x0.5",
+   "python_objective": 5171.806453670297,
+   "ts_objective": 5171.806453670299,
+   "objective_delta_relative": 3.5171258241014936e-16,
+   "python_shed": 4.528123961060823,
+   "ts_shed": 4.528123961060825,
+   "shed_delta_relative": 3.9229421603203984e-16,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_1_line9_cap_x0.5",
+   "python_objective": 5947.751395892129,
+   "ts_objective": 5947.751395892119,
+   "objective_delta_relative": 1.682054452782252e-15,
+   "python_shed": 5.31669733090701,
+   "ts_shed": 5.316697330907,
+   "shed_delta_relative": 1.8375999250336593e-15,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_2_line9_cap_x0.5",
+   "python_objective": 6134.537448683274,
+   "ts_objective": 6134.537448683233,
+   "objective_delta_relative": 6.671613291490535e-15,
+   "python_shed": 5.505701661467536,
+   "ts_shed": 5.505701661467494,
+   "shed_delta_relative": 7.582028284979573e-15,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_3_line9_cap_x0.5",
+   "python_objective": 5886.043873358508,
+   "ts_objective": 5886.043873358475,
+   "objective_delta_relative": 5.562617263527688e-15,
+   "python_shed": 5.255200176080709,
+   "ts_shed": 5.255200176080677,
+   "shed_delta_relative": 6.25334914519152e-15,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_4_line9_cap_x0.5",
+   "python_objective": 603.2490841578638,
+   "ts_objective": 603.2490841578638,
+   "objective_delta_relative": 0,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_all_line9_cap_x0.5",
+   "python_objective": 604.02720045065,
+   "ts_objective": 604.0272004506494,
+   "objective_delta_relative": 9.410738261190643e-16,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 2.842170943040401e-14,
+   "pass": true
+  },
+  {
+   "case_id": "add_0_bus26_removed",
+   "python_objective": 581.3587499999999,
+   "ts_objective": 581.3587499999999,
+   "objective_delta_relative": 0,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_1_bus26_removed",
+   "python_objective": 13529.01875,
+   "ts_objective": 13529.01875,
+   "objective_delta_relative": 0,
+   "python_shed": 13,
+   "ts_shed": 13,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_2_bus26_removed",
+   "python_objective": 13529.01875,
+   "ts_objective": 13529.01875,
+   "objective_delta_relative": 0,
+   "python_shed": 13,
+   "ts_shed": 13,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_3_bus26_removed",
+   "python_objective": 1079.2587500005675,
+   "ts_objective": 1079.2587500005184,
+   "objective_delta_relative": 4.550596777252193e-14,
+   "python_shed": 0.50000000000057,
+   "ts_shed": 0.5000000000005207,
+   "shed_delta_relative": 9.858780458660152e-14,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_4_bus26_removed",
+   "python_objective": 13529.01875,
+   "ts_objective": 13529.01875,
+   "objective_delta_relative": 0,
+   "python_shed": 13,
+   "ts_shed": 13,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_all_bus26_removed",
+   "python_objective": 581.3587499999999,
+   "ts_objective": 581.3587499999999,
+   "objective_delta_relative": 0,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_0_line9_x0.25_noshed",
+   "python_objective": 0,
+   "ts_objective": 0,
+   "objective_delta_relative": 0,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_1_line9_x0.25_noshed",
+   "python_objective": 0,
+   "ts_objective": 0,
+   "objective_delta_relative": 0,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_2_line9_x0.25_noshed",
+   "python_objective": 0,
+   "ts_objective": 0,
+   "objective_delta_relative": 0,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_3_line9_x0.25_noshed",
+   "python_objective": 0,
+   "ts_objective": 0,
+   "objective_delta_relative": 0,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_4_line9_x0.25_noshed",
+   "python_objective": 693.8838965067946,
+   "ts_objective": 693.8838965067948,
+   "objective_delta_relative": 3.2768259443387383e-16,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  },
+  {
+   "case_id": "add_all_line9_x0.25_noshed",
+   "python_objective": 0,
+   "ts_objective": 0,
+   "objective_delta_relative": 0,
+   "python_shed": 0,
+   "ts_shed": 0,
+   "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "pass": true
+  }
+ ],
+ "restoration": [
+  {
+   "case_id": "island_pocket_plus_line9",
+   "n_orders": 6,
+   "max_delta_relative": 1.6130368575711697e-16,
+   "ranking_identical": true,
+   "pass": true
+  },
+  {
+   "case_id": "bus_and_lines",
+   "n_orders": 6,
+   "max_delta_relative": 1.6130368575711697e-16,
+   "ranking_identical": true,
+   "pass": true
+  },
+  {
+   "case_id": "two_buses",
+   "n_orders": 2,
+   "max_delta_relative": 1.7225278442669095e-16,
+   "ranking_identical": true,
+   "pass": true
+  },
+  {
+   "case_id": "k5_mixed",
+   "n_orders": 120,
+   "max_delta_relative": 2.6426508071040455e-16,
+   "ranking_identical": true,
+   "pass": true
+  }
+ ]
+}

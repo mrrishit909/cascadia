@@ -35,7 +35,14 @@ import type { Case30, Precomputed, Scenario } from '../engine/types'
 // rejects every older in-flight request the instant a newer one is issued);
 // none of the above touches that -- it's all about request *construction*
 // racing ahead of state/render timing.
-export interface Scen { removedBus: number | null; lineCapacity: Record<number, number>; allowShed: boolean }
+// CAS-INT-002/003/007 add loadScale (bus -> factor), genPmax (gen idx -> MW override) and disabledLines.
+// They follow the exact same rules as lineCapacity: read from base(), written to pendingRef synchronously,
+// promoted by 'solved', cleared by 'reset'. Every action spreads `...prior` so it can never drop a field
+// it doesn't own, and every solve builds its request through params() so none can be omitted from a request.
+export interface Scen { removedBus: number | null; lineCapacity: Record<number, number>; allowShed: boolean; loadScale: Record<number, number>; genPmax: Record<number, number>; disabledLines: number[] }
+export const params = (s: Scen): ScenarioParams => ({ line_capacity_factor: s.lineCapacity, allow_shed: s.allowShed,
+  load_scale: s.loadScale, gen_pmax_mw: s.genPmax, disabled_lines: s.disabledLines,
+  ...(s.removedBus !== null && { removed_buses: [s.removedBus] }) })
 export interface AppState {
   load: 'loading' | 'ready' | 'error'
   error?: string
@@ -49,6 +56,9 @@ export interface AppState {
   removedBus: number | null
   lineCapacity: Record<number, number> // line idx -> capacity factor
   allowShed: boolean // last confirmed value; see Scen/N1 fix above
+  loadScale: Record<number, number>
+  genPmax: Record<number, number>
+  disabledLines: number[]
   selectedLine: number | null
   pending: Scen | null // scenario intent of the in-flight solve, if any
   // Bumped by 'reset'. lpClient's SupersededError only fires when a NEW solve()
@@ -72,23 +82,23 @@ export type Action =
   | { type: 'solveFailed'; error: string }
   | { type: 'reset' }
 
-const initial: AppState = { load: 'loading', removedBus: null, selectedBus: null, solve: 'idle', lineCapacity: {}, allowShed: true, selectedLine: null, pending: null, epoch: 0 }
+const initial: AppState = { load: 'loading', removedBus: null, selectedBus: null, solve: 'idle', lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], selectedLine: null, pending: null, epoch: 0 }
 
 function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
     case 'loaded': return { ...s, load: 'ready', scenario: a.scenario, network: a.network, result: a.result, baseline: a.result }
     case 'failed': return { ...s, load: 'error', error: a.error }
-    case 'solved': return { ...s, result: a.result, removedBus: a.scenario.removedBus, lineCapacity: a.scenario.lineCapacity, allowShed: a.scenario.allowShed, pending: null, selectedBus: null, solve: 'idle', solveError: undefined }
+    case 'solved': return { ...s, result: a.result, removedBus: a.scenario.removedBus, lineCapacity: a.scenario.lineCapacity, allowShed: a.scenario.allowShed, loadScale: a.scenario.loadScale, genPmax: a.scenario.genPmax, disabledLines: a.scenario.disabledLines, pending: null, selectedBus: null, solve: 'idle', solveError: undefined }
     case 'selectLine': return { ...s, selectedLine: a.line }
     case 'select': return { ...s, selectedBus: a.bus }
     case 'solving': return { ...s, solve: 'solving', solveError: undefined, pending: a.scenario }
     case 'solveFailed': return { ...s, solve: 'error', solveError: a.error, pending: null }
-    case 'reset': return { ...s, result: s.baseline, removedBus: null, lineCapacity: {}, allowShed: true, selectedLine: null, selectedBus: null, solve: 'idle', solveError: undefined, pending: null, epoch: s.epoch + 1 }
+    case 'reset': return { ...s, result: s.baseline, removedBus: null, lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], selectedLine: null, selectedBus: null, solve: 'idle', solveError: undefined, pending: null, epoch: s.epoch + 1 }
   }
 }
 
 export type Solver = (c: Case30, sc: ScenarioParams) => Promise<DcopfResult>
-const Ctx = createContext<{ state: AppState; dispatch: Dispatch<Action>; removeBus: (bus: number) => Promise<void>; setCapacity: (line: number, factor: number, allowShed: boolean) => Promise<void> } | null>(null)
+const Ctx = createContext<{ state: AppState; dispatch: Dispatch<Action>; removeBus: (bus: number) => Promise<void>; setCapacity: (line: number, factor: number, allowShed: boolean) => Promise<void>; setLoadScale: (bus: number, factor: number) => Promise<void>; setGenPmax: (gen: number, mw: number | null) => Promise<void>; setLineOutage: (line: number, out: boolean) => Promise<void> } | null>(null)
 
 // Real Worker, created lazily on first solve.
 function workerSolver(): Solver {
@@ -140,17 +150,17 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
   // written synchronously at each call site below), not state.pending
   // (rendered, can lag by one render -- N3). This is the D1/N1/N3 fix -- see
   // the AppState comment above.
-  const base = useCallback((): Scen => pendingRef.current ?? { removedBus: state.removedBus, lineCapacity: state.lineCapacity, allowShed: state.allowShed },
-    [state.removedBus, state.lineCapacity, state.allowShed])
+  const base = useCallback((): Scen => pendingRef.current ?? { removedBus: state.removedBus, lineCapacity: state.lineCapacity, allowShed: state.allowShed, loadScale: state.loadScale, genPmax: state.genPmax, disabledLines: state.disabledLines },
+    [state.removedBus, state.lineCapacity, state.allowShed, state.loadScale, state.genPmax, state.disabledLines])
   const removeBus = useCallback(async (bus: number) => {
     if (!state.network) return
     const myEpoch = epochRef.current
     const prior = base()
-    const scenario: Scen = { removedBus: bus, lineCapacity: prior.lineCapacity, allowShed: prior.allowShed }
+    const scenario: Scen = { ...prior, removedBus: bus }
     pendingRef.current = scenario // synchronous: must be visible to the very next base() call, not just after re-render
     dispatch({ type: 'solving', scenario })
     try {
-      const r = await solve(state.network, { removed_buses: [bus], line_capacity_factor: scenario.lineCapacity, allow_shed: scenario.allowShed })
+      const r = await solve(state.network, params(scenario))
       if (epochRef.current !== myEpoch) return // reset happened while this solve was in flight; discard
       dispatch({ type: 'solved', scenario, result: {
         id: `bus_removal_${bus}`, label: `Live HiGHS Worker solve: bus ${bus} removed (island-aware DC-OPF)${scenario.allowShed ? '' : ', shedding disabled'}`,
@@ -171,12 +181,11 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
     const prior = base()
     const cap = { ...prior.lineCapacity }
     if (factor === 1) delete cap[line]; else cap[line] = factor
-    const scenario: Scen = { removedBus: prior.removedBus, lineCapacity: cap, allowShed }
+    const scenario: Scen = { ...prior, lineCapacity: cap, allowShed }
     pendingRef.current = scenario
     dispatch({ type: 'solving', scenario })
     try {
-      const r = await solve(state.network, { line_capacity_factor: cap, allow_shed: allowShed,
-        ...(scenario.removedBus !== null && { removed_buses: [scenario.removedBus] }) })
+      const r = await solve(state.network, params(scenario))
       if (epochRef.current !== myEpoch) return // reset happened while this solve was in flight; discard
       dispatch({ type: 'solved', scenario, result: {
         id: `line_capacity_${line}_x${factor}`, label: `Live HiGHS Worker solve: line ${line} capacity x${factor}${allowShed ? '' : ', shedding disabled'}`,
@@ -186,5 +195,36 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
       if (!(e instanceof SupersededError)) dispatch({ type: 'solveFailed', error: e instanceof Error ? e.message : String(e) })
     }
   }, [solve, state.network, state.baseline, base])
-  return <Ctx.Provider value={{ state, dispatch, removeBus, setCapacity }}>{children}</Ctx.Provider>
+  // Shared by the three CAS-INT-002/003/007 actions: same epoch/pendingRef/SupersededError handling as above.
+  const runScen = useCallback(async (next: (prior: Scen) => Scen, id: string, label: string) => {
+    if (!state.network) return
+    const myEpoch = epochRef.current
+    const scenario = next(base())
+    pendingRef.current = scenario
+    dispatch({ type: 'solving', scenario })
+    try {
+      const r = await solve(state.network, params(scenario))
+      if (epochRef.current !== myEpoch) return
+      dispatch({ type: 'solved', scenario, result: { id, label: `Live HiGHS Worker solve: ${label}${scenario.allowShed ? '' : ', shedding disabled'}`,
+        limitations: state.baseline?.limitations ?? [], result: r } })
+    } catch (e) {
+      if (epochRef.current !== myEpoch) return
+      if (!(e instanceof SupersededError)) dispatch({ type: 'solveFailed', error: e instanceof Error ? e.message : String(e) })
+    }
+  }, [solve, state.network, state.baseline, base])
+  const setLoadScale = useCallback((bus: number, f: number) => runScen(p => {
+    const loadScale = { ...p.loadScale }
+    if (f === 1) delete loadScale[bus]; else loadScale[bus] = f
+    return { ...p, loadScale }
+  }, `load_scale_${bus}_x${f}`, `bus ${bus} load x${f}`), [runScen])
+  // mw === null restores the generator's rated Pmax.
+  const setGenPmax = useCallback((gen: number, mw: number | null) => runScen(p => {
+    const genPmax = { ...p.genPmax }
+    if (mw === null) delete genPmax[gen]; else genPmax[gen] = mw
+    return { ...p, genPmax }
+  }, `gen_pmax_${gen}_${mw}`, `generator ${gen} Pmax ${mw === null ? 'rated' : mw + ' MW'}`), [runScen])
+  const setLineOutage = useCallback((line: number, out: boolean) => runScen(p => ({
+    ...p, disabledLines: out ? [...new Set([...p.disabledLines, line])].sort((a, b) => a - b) : p.disabledLines.filter(l => l !== line),
+  }), `line_outage_${line}`, `line ${line} ${out ? 'outage' : 'restored'}`), [runScen])
+  return <Ctx.Provider value={{ state, dispatch, removeBus, setCapacity, setLoadScale, setGenPmax, setLineOutage }}>{children}</Ctx.Provider>
 }

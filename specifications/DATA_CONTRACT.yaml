@@ -31,6 +31,9 @@ model:
   oracle: research/models/oracle.py
   solver: "scipy.optimize.linprog method=highs (primary); pandapower rundcpp/rundcopp cross-check only"
   formulation: "per-island min sum(PWL cost)+VOLL*shed; nodal balance; |PTDF.inj|<=Fmax; Pmin<=P<=Pmax; 0<=shed<=load. No global slack bus."
+  extensions:
+    added_lines: "CAS-INT-004: scenario param = candidate positions k into public/data/raw-metadata/candidate_lines.json (label SYNTHETIC_ASSUMPTION, NOT real case30 topology; line idx 41+k). Added lines join the per-island PTDF/B-matrix with their own x_pu and rating_mw; islands are recomputed so a line can MERGE islands; a line touching a removed bus is dropped. Unadded candidates are carried as disabled lines. Reference: verification/REFERENCE_RESULTS/add_line_restoration.json"
+    restoration: "CAS-INT-006: restoration_sequence/rank_restoration (oracle.py) and restorationSequence/rankRestoration (dcopf.ts). Down elements (removed buses / disabled lines) are restored one per step in a given order; each state is a full island-aware solve. Metric served_mw_steps = sum of served MW over the k degraded states, equal time step per action (ASSUMED, MW*steps not MWh; no crew/duration data). Ties within 1e-6 break lexicographically. All k! orders enumerated, k<=5."
   assumptions:
     voll_eur_per_mwh: {value: 1000, label: SYNTHETIC_ASSUMPTION, note: "not in IEEE data; >> max marginal cost (~12 EUR/MWh), so shedding is last resort"}
     cost_linearization: "4 equal-width secant segments over [Pmin,Pmax]; overestimates true quadratic by <=0.7% in tests"
@@ -50,6 +53,8 @@ tolerances:
 test_vectors:
   CAS-INT-001: {fixture: precomputed/islanding.json, expect: "shed_no_generation_mw=13.0, unserved_removed_mw=0 (removing idx 26)", also: "bus_removal_11 -> unserved_removed_mw=11.2"}
   CAS-INT-005: {fixture: "precomputed/infeasible.json (line 9 x0.25, allow_shed=false -> status infeasible)", sweep: "line_cap_9_x0.5 -> shed_economic_mw=5.2996, binding [9,28,29]"}
+  CAS-INT-004: {reference: "verification/REFERENCE_RESULTS/add_line_restoration.json (add_line_cases, 24)", expect: "removed_buses=[26] + added_lines=[0] -> shed_no_generation_mw=0 (islands merge); parity file add_line_restoration_ts_parity.json"}
+  CAS-INT-006: {reference: "verification/REFERENCE_RESULTS/add_line_restoration.json (restoration_cases, 4)", expect: "down=[line36,line37,line9]: 6 orders, best served_mw_steps=554.6 (rank 1, 4-way tie), worst=541.6 (rank 5)"}
   baseline: {fixture: precomputed/baseline.json, objective: 566.8693625, total_unserved_mw: 0}
 regeneration: |
   uv run python -m research.ingest.export_case30 && uv run python -m research.evaluate.n1_sweep && uv run python -m research.export.export_fixtures

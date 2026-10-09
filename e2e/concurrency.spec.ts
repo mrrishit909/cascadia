@@ -85,7 +85,10 @@ test("reset during an active solve: the stale resolution never overwrites the re
   await page.goto("/");
   await removeBusKeyboard(page, 26); // solve in flight for ~1.5s
   await page.waitForTimeout(100);
-  await expect(page.getByText(/Solving/)).toHaveCount(2, { timeout: 1000 }); // RemoveNode + AlterCapacity both show it
+  // One "Solving..." indicator per control sharing this scenario (every control added over time
+  // raises this count -- assert "at least 1", not a specific number, so this isn't brittle to M4's
+  // growing control count).
+  await expect(page.getByText(/Solving/).first()).toBeVisible({ timeout: 1000 });
   await page.getByRole("button", { name: "Reset to baseline" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-testid="bus"][data-bus="26"]')).toHaveAttribute("data-state", "served");

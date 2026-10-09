@@ -1,15 +1,18 @@
 // TypeScript port of research/models/oracle.py (island-aware DC-OPF). Keep in lockstep with it.
 // Pure function over an injected HiGHS instance so it runs in a Worker (browser) or Node (tests).
-import type { Case30, Island, SolveResult } from './types'
+import type { Case30, Island, Line, SolveResult } from './types'
 
 export const VOLL = 1000
 export const N_SEG = 4
+export const MAX_RESTORE = 5
+export type CandidateLine = Pick<Line, 'idx' | 'from_bus' | 'to_bus' | 'x_pu' | 'rating_mw'>
 const TOL = 1e-6
 
 export interface ScenarioParams {
   removed_buses?: number[]
   line_capacity_factor?: Record<string, number>
   disabled_lines?: number[]
+  added_lines?: number[] // SYNTHETIC candidate-line positions (candidate_lines.json), idx = 41 + position
   gen_pmax_mw?: Record<string, number>
   load_scale?: Record<string, number>
   allow_shed?: boolean
@@ -21,7 +24,7 @@ export interface DcopfResult extends SolveResult {
 
 const fin = (v: number) => Number.isFinite(v)
 
-function validate(c: Case30, sc: ScenarioParams) {
+function validate(c: Case30, sc: ScenarioParams, cands: CandidateLine[]) {
   const nb = c.buses.length, nl = c.lines.length, ng = c.gens.length
   for (const b of sc.removed_buses ?? []) if (!(Number.isInteger(b) && b >= 0 && b < nb)) throw new Error(`invalid bus ${b}`)
   for (const [k, f] of Object.entries(sc.line_capacity_factor ?? {})) {
@@ -37,7 +40,8 @@ function validate(c: Case30, sc: ScenarioParams) {
     if (!(+k >= 0 && +k < nb)) throw new Error(`invalid bus ${k}`)
     if (!(fin(f) && f >= 0)) throw new Error(`invalid load scale ${f}`)
   }
-  for (const l of c.lines) if (!(l.x_pu > 0)) throw new Error('non-positive reactance')
+  for (const k of sc.added_lines ?? []) if (!(Number.isInteger(k) && k >= 0 && k < cands.length)) throw new Error(`invalid candidate line ${k}`)
+  for (const l of [...c.lines, ...cands]) if (!(l.x_pu > 0)) throw new Error('non-positive reactance')
 }
 
 // Gauss-Jordan inverse with partial pivoting (n <= 30).
@@ -137,11 +141,16 @@ function solveIsland(c: Case30, solver: SolverLike, buses: number[], lines: numb
     balance: sum(Object.values(gen)) - (sum(d) - shedSum) }
 }
 
-export function solveDcopf(c: Case30, solver: SolverLike, sc: ScenarioParams = {}): DcopfResult {
-  validate(c, sc)
+export function solveDcopf(c0: Case30, solver: SolverLike, sc: ScenarioParams = {}, cands: CandidateLine[] = []): DcopfResult {
+  validate(c0, sc, cands)
+  const added = new Set(sc.added_lines ?? [])
+  const n0 = c0.lines.length
+  // unadded candidates are appended as disabled lines so line idx stays the array position (mirrors oracle.py)
+  const c: Case30 = added.size ? { ...c0, lines: [...c0.lines, ...cands.map((l, k) => ({ ...(l as Line), idx: n0 + k }))] } : c0
   const removed = new Set(sc.removed_buses ?? [])
   const allowShed = sc.allow_shed ?? true
   const off = new Set((sc.disabled_lines ?? []).map(Number))
+  if (added.size) cands.forEach((_, k) => { if (!added.has(k)) off.add(n0 + k) })
   const pmax: Record<number, number> = {}
   for (const g of c.gens) pmax[g.idx] = sc.gen_pmax_mw?.[g.idx] ?? g.pmax_mw
   const load: Record<number, number> = {}
@@ -203,7 +212,57 @@ export function solveDcopf(c: Case30, solver: SolverLike, sc: ScenarioParams = {
   }
   for (const g of c.gens) out.gen[g.idx] ??= 0
   const binding = Object.entries(out.flows).filter(([li, f]) => rating[+li] > 0 && Math.abs(f) >= rating[+li] - 1e-6).map(([li]) => +li).sort((a, b) => a - b)
-  return { ...out, binding_lines: binding, line_rating_mw: rating, objective: obj, unserved_removed_mw: unservedRemoved,
+  return { ...out, binding_lines: binding, line_rating_mw: Object.fromEntries(Object.entries(rating).filter(([i]) => !off.has(+i) || +i < n0)), objective: obj, unserved_removed_mw: unservedRemoved,
     shed_no_generation_mw: shedNoGen, shed_economic_mw: shedEcon, total_unserved_mw: unservedRemoved + shedNoGen + shedEcon,
     total_load_mw: Object.values(load).reduce((a, b) => a + b, 0) }
+}
+
+// ---- CAS-INT-006: restoration sequencing (mirror of oracle.py; see the METRIC comment there) -----------------
+// Metric: served_mw_steps = sum over states 0..k-1 (after i restorations) of total_load - total_unserved, one equal
+// time step per restoration action (labeled assumption, MW*steps not MWh). Final state excluded (same for all orders).
+// Ties within 1e-6 break by lexicographic order. All k! orders enumerated, k <= 5.
+export interface DownElement { kind: 'bus' | 'line'; id: number }
+export interface RestoreStep { step: number; restored: number[]; served_mw: number; unserved_mw: number; status: string }
+export interface RestoreSeq { order: number[]; steps: RestoreStep[]; served_mw_steps: number; final_served_mw: number; rank?: number }
+
+function restoreState(base: ScenarioParams, down: DownElement[], restored: Set<number>): ScenarioParams {
+  const pick = (kind: string, init?: number[]) => [...new Set([...(init ?? []), ...down.filter((e, i) => e.kind === kind && !restored.has(i)).map((e) => e.id)])].sort((a, b) => a - b)
+  return { ...base, removed_buses: pick('bus', base.removed_buses), disabled_lines: pick('line', base.disabled_lines) }
+}
+
+export function restorationOrders(k: number): number[][] {
+  if (!(Number.isInteger(k) && k >= 0 && k <= MAX_RESTORE)) throw new Error(`at most ${MAX_RESTORE} down elements supported, got ${k}`)
+  const out: number[][] = []
+  const rec = (cur: number[], rest: number[]) => { if (!rest.length) out.push(cur); rest.forEach((v, i) => rec([...cur, v], rest.filter((_, j) => j !== i))) }
+  rec([], Array.from({ length: k }, (_, i) => i))
+  return out // lexicographic, same as itertools.permutations
+}
+
+export function restorationSequence(c: Case30, solver: SolverLike, down: DownElement[], order: number[], base: ScenarioParams = {},
+  cands: CandidateLine[] = [], cache: Map<string, RestoreStep> = new Map()): RestoreSeq {
+  const k = down.length
+  if ([...order].sort((a, b) => a - b).join() !== Array.from({ length: k }, (_, i) => i).join()) throw new Error('order must be a permutation of down-element indices')
+  for (const e of down) if (e.kind !== 'bus' && e.kind !== 'line') throw new Error(`invalid element kind ${e.kind}`)
+  const steps: RestoreStep[] = []
+  for (let i = 0; i <= k; i++) {
+    const rs = order.slice(0, i), key = [...rs].sort((a, b) => a - b).join()
+    if (!cache.has(key)) {
+      const r = solveDcopf(c, solver, restoreState(base, down, new Set(rs)), cands)
+      cache.set(key, { step: 0, restored: [], served_mw: r.total_load_mw - r.total_unserved_mw, unserved_mw: r.total_unserved_mw, status: r.status })
+    }
+    steps.push({ ...cache.get(key)!, step: i, restored: i ? [order[i - 1]] : [] })
+  }
+  return { order: [...order], steps, served_mw_steps: steps.slice(0, k).reduce((s, x) => s + x.served_mw, 0), final_served_mw: steps[k].served_mw }
+}
+
+export function rankRestoration(c: Case30, solver: SolverLike, down: DownElement[], orders?: number[][], base: ScenarioParams = {},
+  cands: CandidateLine[] = []): RestoreSeq[] {
+  const os = orders ?? restorationOrders(down.length)
+  if (!os.length) throw new Error('need at least one order')
+  const cache = new Map<string, RestoreStep>()
+  const res = os.map((o) => restorationSequence(c, solver, down, o, base, cands, cache))
+  const lex = (a: number[], b: number[]) => { for (let i = 0; i < Math.min(a.length, b.length); i++) if (a[i] !== b[i]) return a[i] - b[i]; return a.length - b.length }
+  res.sort((a, b) => { const d = b.served_mw_steps - a.served_mw_steps; return Math.abs(d) > 1e-6 ? (d < 0 ? -1 : 1) : lex(a.order, b.order) })
+  res.forEach((r, i) => { r.rank = i === 0 ? 1 : Math.abs(res[i - 1].served_mw_steps - r.served_mw_steps) <= 1e-6 ? res[i - 1].rank! : i + 1 })
+  return res
 }

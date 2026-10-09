@@ -1,0 +1,16 @@
+{
+  "provenance": {
+    "label": "SYNTHETIC_ASSUMPTION",
+    "warning": "NOT part of the real IEEE case30 topology. Hand-picked hypothetical lines for the CAS-INT-004 'add line' control; any resemblance to a real planned line is coincidental.",
+    "rationale": "Bus pairs with no direct line in case30. x_pu and rating_mw are chosen in the range of nearby existing lines (x 0.2-0.5 pu, 16-65 MW); x_pu is on sn_mva=100 like case30 lines.",
+    "generator": "hand-written (no seed, deterministic)",
+    "idx_convention": "idx = 41 + candidate position, continuing case30 line idx 0..40; 'added_lines' scenario param lists candidate positions (0-based)"
+  },
+  "lines": [
+    {"idx": 41, "from_bus": 27, "to_bus": 28, "x_pu": 0.35, "rating_mw": 32, "note": "re-ties the {28,29} pocket that bus 26 otherwise feeds; merges islands when bus 26 is removed"},
+    {"idx": 42, "from_bus": 9,  "to_bus": 14, "x_pu": 0.20, "rating_mw": 32, "note": "alternate route between the 9/10 and 14/15 corridors"},
+    {"idx": 43, "from_bus": 5,  "to_bus": 11, "x_pu": 0.25, "rating_mw": 65, "note": "second path from the main 5/6 hub into the 11/12 branch (parallel to line 3-11)"},
+    {"idx": 44, "from_bus": 24, "to_bus": 29, "x_pu": 0.50, "rating_mw": 16, "note": "weak tie into the far {28,29} pocket"},
+    {"idx": 45, "from_bus": 7,  "to_bus": 21, "x_pu": 0.25, "rating_mw": 32, "note": "bypass of bus 9 between 8 and 22"}
+  ]
+}
