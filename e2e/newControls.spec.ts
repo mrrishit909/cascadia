@@ -29,6 +29,25 @@ async function disallowSheddingGlobally(page: Page) {
   await expect(page.locator(".provenance")).toContainText("shedding disabled", { timeout: 2000 });
 }
 
+test("regression: selecting a generator then immediately setting its slider is not reverted by the resync effect", async ({ page }) => {
+  // Found while investigating an advisor-flagged "0.00 MW" failure in the D2 test below: the old
+  // resync effect (keyed on [gen, epoch]) ran asynchronously after the select's onChange, leaving a
+  // window where an immediately-following slider set landed before the effect's own flush and got
+  // silently overwritten back to `rated` -- which then made Apply's `mw === rated` check submit
+  // "restore to rated" instead of the user's actual value. Reproduced directly (100% across 30 runs
+  // with no settle delay) and fixed by setting gen+mw synchronously in one onChange handler instead of
+  // splitting the reset across a separate effect. This test pins the exact interleaving that broke it.
+  await page.goto("/");
+  const genSelect = page.locator('section:has-text("Reduce generator") select');
+  const slider = page.locator('section:has-text("Reduce generator") input[type=range]');
+  await genSelect.selectOption({ index: 1 }); // gen 0, rated 80 MW
+  await slider.fill("0"); // immediately, no settle wait -- this is the exact race window
+  await expect(page.getByTestId("gen-pmax")).toHaveText("0 MW");
+  await page.getByRole("button", { name: "Apply limit" }).click();
+  await expect(page.getByTestId("gen-pmax")).toHaveText("0 MW"); // must stay 0, not bounce back to 80
+  await expect(page.locator(".provenance")).toContainText("generator 0 Pmax 0 MW");
+});
+
 test("D2: zeroing enough generation with 'Allow load shedding' off shows n/a (infeasible), never 0.00", async ({ page }) => {
   await page.goto("/");
   await disallowSheddingGlobally(page);

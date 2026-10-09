@@ -10,20 +10,24 @@ export function IncreaseLoad() {
   const eff = pending?.loadScale ?? loadScale
   const [bus, setBus] = useState<number | null>(null)
   const [f, setF] = useState(1)
-  // N2 fix (same bug class as AlterCapacity.tsx, reintroduced here): resync ONLY on bus selection
-  // change or an actual reset (epoch bump) -- never on every `pending`/`loadScale` change, since those
-  // also fire for unrelated controls' solves (e.g. a line outage resolving), which would otherwise
-  // silently overwrite this draft slider's not-yet-applied value with the last-confirmed one.
-  useEffect(() => { setF(bus === null ? 1 : eff[bus] ?? 1) },
+  // D1/N2-class fix (same race as ReduceGenerator.tsx, see its comment): resyncing `f` from an effect
+  // keyed on `bus` left a gap where an immediate slider move after selection could be silently reverted
+  // once the effect flushed. Set bus and f synchronously in the same onChange handler instead. An actual
+  // reset (epoch bump) still needs its own effect.
+  useEffect(() => { if (bus !== null) setF(eff[bus] ?? 1) },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [bus, epoch])
+    [epoch])
   if (!network) return null
   const base = bus === null ? 0 : network.loads.find(l => l.bus === bus)?.p_mw ?? 0
+  const selectBus = (next: number | null) => {
+    setBus(next)
+    setF(next === null ? 1 : eff[next] ?? 1)
+  }
   return (
     <section aria-labelledby="il-h">
       <h2 id="il-h">Increase load</h2>
       <label>Load bus{' '}
-        <select value={bus ?? ''} onChange={e => setBus(e.target.value === '' ? null : +e.target.value)}>
+        <select value={bus ?? ''} onChange={e => selectBus(e.target.value === '' ? null : +e.target.value)}>
           <option value="">Select a bus</option>
           {network.loads.map(l => <option key={l.bus} value={l.bus}>{network.buses[l.bus].name} ({l.p_mw} MW)</option>)}
         </select>
