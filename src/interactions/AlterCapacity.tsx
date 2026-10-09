@@ -14,11 +14,33 @@ export function AlterCapacity() {
   const [factor, setFactor] = useState(1)
   const [allowShed, setAllowShed] = useState(true)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  // The debounce timer schedules its call 250ms in the future; if it captured
+  // `setCapacity` directly, a removal confirmed during that window would still
+  // fire the OLD (pre-removal) closure when the timer elapses, rebuilding its
+  // request from stale state and silently dropping the removal -- the same bug
+  // class as D1, reached through the debounce window instead of a direct call.
+  // Routing through a ref kept current every render means the deferred call
+  // always uses the latest setCapacity, whose own closure reads the latest
+  // pending/confirmed scenario via base().
+  const setCapacityRef = useRef(setCapacity)
+  useEffect(() => { setCapacityRef.current = setCapacity }, [setCapacity])
   const atBaseline = result === baseline
-  // Re-sync the draft on line change or reset; not on every solve (would fight an in-progress drag).
+  // Re-sync the draft on line change or on an actual reset (baseline newly true) only -- NOT on every
+  // atBaseline toggle. atBaseline also flips false->true->false from OTHER controls' unrelated solves
+  // (e.g. a bus removal moving `result` away from `baseline`); resyncing on that edge too was clobbering
+  // an in-progress slider draft back to the last-committed value, silently discarding the user's not-yet-
+  // debounced capacity change. Same bug class as D1 (a confirmed/in-progress action overwritten by a
+  // stale resync), reached through this effect instead of request construction.
+  const wasAtBaseline = useRef(atBaseline)
+  useEffect(() => {
+    const justReset = atBaseline && !wasAtBaseline.current
+    wasAtBaseline.current = atBaseline
+    if (justReset) { clearTimeout(timer.current); setFactor(selectedLine === null ? 1 : lineCapacity[selectedLine] ?? 1) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [atBaseline])
   useEffect(() => { clearTimeout(timer.current); setFactor(selectedLine === null ? 1 : lineCapacity[selectedLine] ?? 1) },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedLine, atBaseline])
+    [selectedLine])
   useEffect(() => { if (atBaseline) setAllowShed(true) }, [atBaseline])
   useEffect(() => () => clearTimeout(timer.current), [])
   if (!network || !result) return null
@@ -27,7 +49,7 @@ export function AlterCapacity() {
   const line = selectedLine === null ? null : network.lines[selectedLine]
   const fire = (f: number, shed: boolean) => {
     clearTimeout(timer.current)
-    if (selectedLine !== null) timer.current = setTimeout(() => { void setCapacity(selectedLine, f, shed) }, DEBOUNCE_MS)
+    if (selectedLine !== null) timer.current = setTimeout(() => { void setCapacityRef.current(selectedLine, f, shed) }, DEBOUNCE_MS)
   }
   return (
     <section aria-labelledby="ac-h">

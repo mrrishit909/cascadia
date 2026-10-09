@@ -14,6 +14,11 @@ const stubFetch = () => vi.stubGlobal('fetch', async (url: string) => ({
   ok: true, json: async () => (await files[`/public${url.slice(url.indexOf('/data/'))}`]()),
 }))
 
+// epoch is internal bookkeeping (see AppState's comment in state.tsx) that legitimately changes on every
+// reset by design (that's how a stale in-flight solve is told to discard itself) -- it isn't part of the
+// user-visible "scenario state" that an exact reset promises to restore, so exclude it from equality checks.
+const sansEpoch = (s: AppState) => { const { epoch: _epoch, ...rest } = s; return rest }
+
 async function setup(solver: Parameters<typeof AppProvider>[0]['solver']) {
   stubFetch()
   const h: { state: AppState; api: ReturnType<typeof useApp> } = {} as never
@@ -33,7 +38,8 @@ it('CAS-INT-001: reset after bus removal deep-equals the post-load state', async
   await waitFor(() => expect(h.state.removedBus).toBe(26))
   expect(h.state).not.toEqual(before)
   fireEvent.click(screen.getByText('Reset to baseline'))
-  expect(h.state).toEqual(before)
+  expect(sansEpoch(h.state)).toEqual(sansEpoch(before))
+  expect(h.state.epoch).toBe(before.epoch + 1) // reset bumps epoch -- see state.tsx
 })
 
 it('CAS-INT-005: reset after capacity change deep-equals the post-load state', async () => {
@@ -46,7 +52,8 @@ it('CAS-INT-005: reset after capacity change deep-equals the post-load state', a
   await waitFor(() => expect(h.state.lineCapacity).toEqual({ 9: 0.5 }), { timeout: 3000 })
   expect(h.state).not.toEqual(before)
   fireEvent.click(screen.getByText('Reset to baseline'))
-  expect(h.state).toEqual(before)
+  expect(sansEpoch(h.state)).toEqual(sansEpoch(before))
+  expect(h.state.epoch).toBe(before.epoch + 1)
 })
 
 it('interruption: bus A then bus B; A reply arrives last yet only B is stored/displayed', async () => {

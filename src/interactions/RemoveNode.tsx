@@ -7,7 +7,7 @@ const mw = (v: number) => `${v.toFixed(2)} MW`
 // CAS-INT-001. Pick a bus (SVG bus or the select), Remove -> Confirm/Cancel (Escape cancels), Reset restores baseline.
 export function RemoveNode() {
   const { state, dispatch, removeBus } = useApp()
-  const { network, result, selectedBus, removedBus, solve, solveError } = state
+  const { network, result, selectedBus, removedBus, solve, solveError, pending } = state
   const confirmRef = useRef<HTMLButtonElement>(null)
   if (!network || !result) return null
   const r = result.result as Partial<DcopfResult> & typeof result.result
@@ -29,7 +29,10 @@ export function RemoveNode() {
           <button disabled={solving} onClick={() => dispatch({ type: 'select', bus: null })}>Cancel</button>
         </div>
       )}
-      <button disabled={solving || (removedBus === null && result === state.baseline)} onClick={() => dispatch({ type: 'reset' })}>Reset to baseline</button>
+      {/* Reset is safe during an active solve: the epoch guard in state.tsx (see AppState comment) ensures
+          that solve's eventual resolution is discarded rather than overwriting the just-reset state when
+          it lands. Disabled only when there's genuinely nothing to reset (no confirmed or pending change). */}
+      <button disabled={removedBus === null && pending === null && result === state.baseline} onClick={() => dispatch({ type: 'reset' })}>Reset to baseline</button>
       {solving && <p role="status">Solving island-aware DC-OPF in Worker...</p>}
       {solve === 'error' && <p role="alert">Solve failed: {solveError}</p>}
       {r.status === 'infeasible' && <p role="alert">Infeasible: {r.diagnostics.join('; ') || 'no feasible dispatch'}</p>}
