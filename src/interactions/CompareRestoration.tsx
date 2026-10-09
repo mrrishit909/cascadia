@@ -61,7 +61,11 @@ export function CompareRestoration() {
       setRanking(r); setStatus('idle')
     } catch (e) {
       if (!mounted.current) return
-      if (e instanceof SupersededError) return // superseded by a later compare() call (re-picking a preset mid-rank)
+      // superseded by a later compare() call. Not currently reachable through the shipped UI (select and
+      // Compare both disable during loading, confirmed by the independent review: instrumented
+      // postMessage, always exactly 1 call per Compare click) -- kept as defensive handling for a future
+      // UI change that allows re-triggering mid-rank, not dead code removal bait.
+      if (e instanceof SupersededError) return
       setStatus('error'); setError(e instanceof Error ? e.message : String(e))
     }
   }

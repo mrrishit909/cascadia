@@ -57,3 +57,15 @@ test("isolation: Compare's own request does not hang an unrelated control's in-f
   await expect(page.getByText(/Solving/)).toHaveCount(0, { timeout: 10000 });
   await expect(page.getByTestId("cr-n-orders")).toHaveText("6", { timeout: 10000 });
 });
+
+test("keyboard-only parity: select preset, Compare, and choose an order without a mouse", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('section:has-text("Compare restoration") select').selectOption("two_buses");
+  await page.getByRole("button", { name: "Compare" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("cr-n-orders")).toHaveText("2", { timeout: 5000 });
+  const rows = page.locator('section:has-text("Compare restoration") li button');
+  await rows.nth(1).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("cr-chosen-rank")).toHaveText("2");
+});
