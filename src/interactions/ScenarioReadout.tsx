@@ -1,6 +1,6 @@
 import { useApp } from '../app/state'
 
-// Reset is the single shared 'Reset to baseline' button in RemoveNode (clears all fields).
+// Reset is the single shared 'Reset to baseline' button (src/app/ResetButton.tsx, clears all fields).
 // Shared status block for the CAS-INT-002/003/007 controls. Every number is from the latest Worker result;
 // infeasible shows n/a, never 0.00 (see NO_FAKE_NUMBERS_AUDIT #6).
 //

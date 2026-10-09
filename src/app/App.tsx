@@ -8,6 +8,7 @@ import { AddLine } from '../interactions/AddLine'
 import { CompareRestoration } from '../interactions/CompareRestoration'
 import { StatusRegion } from '../interactions/StatusRegion'
 import { RestorationStatusRegion } from '../interactions/RestorationStatusRegion'
+import { ResetButton } from './ResetButton'
 import { NetworkView } from '../visualization/NetworkView'
 
 export function Scene() {
@@ -29,6 +30,7 @@ export function Scene() {
         // is still in flight must continue the SAME direction, not flip it (matches AddLine.tsx's own
         // `eff` computation) -- found by advisor review, confirmed reachable via rapid SVG double-click.
         onToggleCandidate={pos => { const eff = state.pending?.addedLines ?? state.addedLines; void setAddedLine(pos, !eff.includes(pos)) }} />
+      <ResetButton />
       <RemoveNode />
       <AlterCapacity />
       <IncreaseLoad />

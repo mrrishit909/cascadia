@@ -4,15 +4,14 @@ import type { DcopfResult } from '../engine/dcopf'
 
 const mw = (v: number) => `${v.toFixed(2)} MW`
 
-// CAS-INT-001. Pick a bus (SVG bus or the select), Remove -> Confirm/Cancel (Escape cancels), Reset restores baseline.
-// selectedBus is already shared AppState (no local draft to lift). NOTE: this component also hosts the
-// single "Reset to baseline" button for the whole app -- if RemoveNode is ever dual-mounted (home
-// chapter + lab, matching every other control per docs/ART_DIRECTION.md), that button would duplicate
-// and getByRole('button', {name: 'Reset to baseline'}) locators across the e2e suite would need
-// scoping. Not yet an issue: nothing mounts this twice today. Flagged for the chapter-scaffolding pass.
+// CAS-INT-001. Pick a bus (SVG bus or the select), Remove -> Confirm/Cancel (Escape cancels).
+// selectedBus is already shared AppState (no local draft to lift). The app-wide "Reset to baseline"
+// button used to live here; moved to src/app/ResetButton.tsx (its own always-single-mount home) ahead
+// of RemoveNode ever being dual-mounted (home chapter + lab, matching every other control per
+// docs/ART_DIRECTION.md) -- a reset button owned by a dual-mounted component would duplicate.
 export function RemoveNode() {
   const { state, dispatch, removeBus } = useApp()
-  const { network, result, selectedBus, removedBus, solve, solveError, pending } = state
+  const { network, result, selectedBus, removedBus, solve, solveError } = state
   const headingId = useId()
   const confirmRef = useRef<HTMLButtonElement>(null)
   if (!network || !result) return null
@@ -35,10 +34,6 @@ export function RemoveNode() {
           <button disabled={solving} onClick={() => dispatch({ type: 'select', bus: null })}>Cancel</button>
         </div>
       )}
-      {/* Reset is safe during an active solve: the epoch guard in state.tsx (see AppState comment) ensures
-          that solve's eventual resolution is discarded rather than overwriting the just-reset state when
-          it lands. Disabled only when there's genuinely nothing to reset (no confirmed or pending change). */}
-      <button disabled={removedBus === null && pending === null && result === state.baseline} onClick={() => dispatch({ type: 'reset' })}>Reset to baseline</button>
       {/* Architecture-stabilization fix: these were role="status"/role="alert" (each an independent
           live region) -- a single solve triggered duplicate screen-reader announcements across every
           mounted control. The shared <StatusRegion/> (App.tsx) is now the only live-announcing
