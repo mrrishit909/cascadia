@@ -1,0 +1,154 @@
+# CASCADIA project requirements. Seeded from ~/creative-engineering/specifications/REQUIREMENTS.yaml
+# (master copy) on 2026-10-08, plus the 5 acceptance-gate rows added here per
+# .claude/skills/spec-extraction's own instruction ("Add requirement rows for... the 5
+# acceptance gates already listed in the dossier's Acceptance gates table -- these need
+# IDs too"). Full validation provenance:
+# ~/creative-engineering/docs/planning/cascadia/REQUIREMENT_COVERAGE_MATRIX.md
+requirements:
+  # --- P0/P1 interaction requirements (source of truth: the Atlas's own execution contract) ---
+  - id: CAS-INT-001
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88, CAS-INT-001"
+    given: "baseline fixture (case30) loaded"
+    when: "a user selects a substation and confirms removal"
+    then: "the substation is marked unavailable, feasible service is recomputed via the island-aware DC-OPF, unserved load (MW) is shown from the solver output, an infeasible diagnostic is exposed when applicable, and undo restores the exact baseline"
+    behavior: "Remove node"
+    owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
+    verification: ["unit:island_balance", "unit:n1_parity_sweep", "e2e:cas_substation_remove_keyboard"]
+    status: unstarted
+    evidence_paths: []
+  - id: CAS-INT-002
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88, CAS-INT-002"
+    given: "baseline fixture loaded"
+    when: "a user raises load at a bus"
+    then: "the dispatch LP is resolved, line thickness/color reflects the new flow, and infeasible load levels show a diagnostic instead of a silently-clamped number"
+    behavior: "increase load"
+    owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
+    verification: ["unit:n1_parity_sweep", "e2e:cas_load_increase"]
+    status: unstarted
+    evidence_paths: []
+  - id: CAS-INT-003
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88, CAS-INT-003"
+    given: "baseline fixture loaded"
+    when: "a user reduces a generator's output limit"
+    then: "dispatch is recomputed and load-shed markers appear if the remaining capacity cannot serve demand"
+    behavior: "reduce generator"
+    owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
+    verification: ["unit:n1_parity_sweep", "e2e:cas_generator_reduce"]
+    status: unstarted
+    evidence_paths: []
+  - id: CAS-INT-004
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88, CAS-INT-004"
+    given: "baseline fixture loaded"
+    when: "a user adds a new transmission line between two buses (from a labeled-synthetic candidate list)"
+    then: "the graph is recomputed and new routing/flow is shown"
+    behavior: "add line"
+    owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
+    verification: ["unit:n1_parity_sweep", "e2e:cas_line_add"]
+    status: unstarted
+    evidence_paths: []
+  - id: CAS-INT-005
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88, CAS-INT-005"
+    given: "baseline fixture loaded"
+    when: "a user alters a line's thermal capacity"
+    then: "the constraint-binding status is recalculated and affected edges are visually refreshed"
+    behavior: "alter line capacity"
+    owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
+    verification: ["unit:n1_parity_sweep", "e2e:cas_capacity_change"]
+    status: unstarted
+    evidence_paths: []
+  - id: CAS-INT-006
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88, CAS-INT-006"
+    given: "a fault scenario with at least 2 candidate restoration sequences"
+    when: "a user chooses a restoration sequence"
+    then: "served energy is ranked and a comparison animation shows the alternatives"
+    behavior: "compare restoration"
+    owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
+    verification: ["unit:restoration_ranking", "e2e:cas_restoration_compare"]
+    status: unstarted
+    evidence_paths: []
+  - id: CAS-INT-007
+    project: "CASCADIA"
+    priority: P1
+    source: "Creative Engineering Atlas dossier p.7, interaction 1 (\"Disable a line\"); not covered by any contract ID, proposed and user-approved during CASCADIA planning pass"
+    given: "baseline fixture loaded"
+    when: "a user disables a transmission line (distinct from INT-001 node removal and INT-005 capacity change)"
+    then: "islands/flow are recalculated and affected regions are visually darkened"
+    behavior: "line outage"
+    owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
+    verification: ["unit:island_balance", "e2e:cas_line_outage"]
+    status: unstarted
+    evidence_paths: []
+
+  # --- Acceptance gates (source of truth: the Atlas's own executable contract table) ---
+  - id: CAS-DATA-001
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88"
+    given: "the case30 fixture and its provenance chain"
+    when: "the dataset-verification skill is run"
+    then: "source/license review is documented, schema is validated, a fixture checksum exists, and the reference calculator's test suite passes"
+    behavior: "Source/license review; schema; fixture checksum; reference calculator test."
+    owner: "data-engineer + data-ai-engineer"
+    verification: ["manual:dataset-verification skill output", "unit:oracle test suite"]
+    status: unstarted
+    evidence_paths: []
+  - id: CAS-MATH-001
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88"
+    given: "the island-aware DC-OPF oracle implementation"
+    when: "the N-1 parity sweep and boundary/infeasible-case tests run"
+    then: "the Python oracle and the independent pandapower cross-check agree on feasible cases, and boundary/infeasible cases produce the documented diagnostic, not a silent failure"
+    behavior: "Independent numerical baseline, boundary and infeasible-case agreement."
+    owner: "data-ai-engineer, independently re-verified by qa-engineer"
+    verification: ["unit:n1_parity_sweep", "unit:boundary_cases", "unit:infeasible_cases"]
+    status: unstarted
+    evidence_paths: []
+  - id: CAS-UX-001
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88"
+    given: "the production build"
+    when: "qa-engineer runs the full interaction test suite"
+    then: "all 6 P0 controls work with keyboard/touch/reset parity, recorded as e2e tests"
+    behavior: "Six working controls + keyboard/touch/reset, recorded e2e tests."
+    owner: "qa-engineer"
+    verification: ["e2e: all CAS-INT-00N tests"]
+    status: unstarted
+    evidence_paths: []
+  - id: CAS-MOTION-001
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88"
+    given: "the production build"
+    when: "browser-design-review runs"
+    then: "the intro and all 6 chapters are captured at every required breakpoint, with reverse-scroll and reduced-motion variants tested"
+    behavior: "Intro and all six chapter captures, reverse-scroll and reduced-motion tests."
+    owner: "motion-engineer (build) + qa-engineer/creative-director (independent review)"
+    verification: ["manual:browser-design-review skill output", "visual:verification/SCREENSHOTS"]
+    status: unstarted
+    evidence_paths: []
+  - id: CAS-RELEASE-001
+    project: "CASCADIA"
+    priority: P0
+    source: "Creative Engineering Atlas executable contract p.88"
+    given: "the full build"
+    when: "deployment-verification runs"
+    then: "the production build succeeds, the Pages base path resolves correctly, a deployed smoke test passes, and LIMITATIONS.md honestly states what's simulated/unverified"
+    behavior: "Production build, Pages base path, deployed smoke test, honest limitations."
+    owner: "orchestrator + qa-engineer"
+    verification: ["manual:deployment-verification skill output", "curl: live URL smoke test"]
+    status: unstarted
+    evidence_paths: []
