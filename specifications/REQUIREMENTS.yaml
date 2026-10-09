@@ -28,9 +28,10 @@ requirements:
     then: "the dispatch LP is resolved, line thickness/color reflects the new flow, and infeasible load levels show a diagnostic instead of a silently-clamped number"
     behavior: "increase load"
     owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
-    verification: ["unit:n1_parity_sweep", "e2e:cas_load_increase"]
+    verification: ["unit:n1_parity_sweep", "unit:load_gen_sweep", "e2e:newControls.spec.ts"]
     status: implemented
-    evidence_paths: ["src/app/newControls.test.tsx"]
+    evidence_paths: ["src/app/newControls.test.tsx", "tests/unit/loadGenParity.test.ts", "verification/REFERENCE_RESULTS/load_gen_sweep.json", "e2e/newControls.spec.ts"]
+    note: "39-case oracle sweep (7 forcing partial shed, not just the all-or-nothing total-load case) parity-verified against the TS Worker. A reintroduced N2-class bug (slider draft resynced on every unrelated control's pending change) found and fixed during this pass. Not yet independently reviewed."
   - id: CAS-INT-003
     project: "CASCADIA"
     priority: P0
@@ -40,9 +41,10 @@ requirements:
     then: "dispatch is recomputed and load-shed markers appear if the remaining capacity cannot serve demand"
     behavior: "reduce generator"
     owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
-    verification: ["unit:n1_parity_sweep", "e2e:cas_generator_reduce"]
+    verification: ["unit:n1_parity_sweep", "unit:load_gen_sweep", "e2e:newControls.spec.ts"]
     status: implemented
-    evidence_paths: ["src/app/newControls.test.tsx"]
+    evidence_paths: ["src/app/newControls.test.tsx", "tests/unit/loadGenParity.test.ts", "verification/REFERENCE_RESULTS/load_gen_sweep.json", "e2e/newControls.spec.ts"]
+    note: "Same N2-class fix and sweep coverage as CAS-INT-002 (shared ReduceGenerator/IncreaseLoad draft-resync bug). Not yet independently reviewed."
   - id: CAS-INT-004
     project: "CASCADIA"
     priority: P0
@@ -89,9 +91,10 @@ requirements:
     then: "islands/flow are recalculated and affected regions are visually darkened"
     behavior: "line outage"
     owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
-    verification: ["unit:island_balance", "e2e:cas_line_outage"]
+    verification: ["unit:island_balance", "e2e:newControls.spec.ts"]
     status: implemented
-    evidence_paths: ["src/app/newControls.test.tsx"]
+    evidence_paths: ["src/app/newControls.test.tsx", "e2e/newControls.spec.ts"]
+    note: "Covered by the D1/D2/N1/N2 e2e probes alongside CAS-INT-002/003 (shares runScen plumbing). Not yet independently reviewed."
 
   # --- Acceptance gates (source of truth: the Atlas's own executable contract table) ---
   - id: CAS-DATA-001

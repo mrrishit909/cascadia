@@ -1,0 +1,819 @@
+{
+ "meta": {
+  "generator": "research/evaluate/load_gen_sweep.py",
+  "deterministic": true,
+  "seed": null,
+  "voll": 1000.0,
+  "cost_segments": 4,
+  "label": "SIMULATED (oracle output on REAL_IEEE case30 topology; VOLL synthetic)",
+  "tolerance_mw": 1e-06,
+  "purpose": "partial-shed/binding-line parity coverage for CAS-INT-002/003, distinct from the all-or-nothing shed probe used during manual M4 QA"
+ },
+ "cases": [
+  {
+   "case_id": "gen_pmax_0_zero",
+   "scenario": {
+    "gen_pmax_mw": {
+     "0": 0.0
+    }
+   },
+   "status": "optimal",
+   "objective": 615.1828124862157,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_0_half",
+   "scenario": {
+    "gen_pmax_mw": {
+     "0": 40.0
+    }
+   },
+   "status": "optimal",
+   "objective": 566.8693625,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_1_zero",
+   "scenario": {
+    "gen_pmax_mw": {
+     "1": 0.0
+    }
+   },
+   "status": "optimal",
+   "objective": 639.3400301613436,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_1_half",
+   "scenario": {
+    "gen_pmax_mw": {
+     "1": 40.0
+    }
+   },
+   "status": "optimal",
+   "objective": 574.27228125,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_2_zero",
+   "scenario": {
+    "gen_pmax_mw": {
+     "2": 0.0
+    }
+   },
+   "status": "optimal",
+   "objective": 600.3423325636732,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_2_half",
+   "scenario": {
+    "gen_pmax_mw": {
+     "2": 25.0
+    }
+   },
+   "status": "optimal",
+   "objective": 566.8693625,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_3_zero",
+   "scenario": {
+    "gen_pmax_mw": {
+     "3": 0.0
+    }
+   },
+   "status": "optimal",
+   "objective": 581.3587499999999,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_3_half",
+   "scenario": {
+    "gen_pmax_mw": {
+     "3": 27.5
+    }
+   },
+   "status": "optimal",
+   "objective": 567.063375,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_4_zero",
+   "scenario": {
+    "gen_pmax_mw": {
+     "4": 0.0
+    }
+   },
+   "status": "optimal",
+   "objective": 574.3936637127038,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_4_half",
+   "scenario": {
+    "gen_pmax_mw": {
+     "4": 15.0
+    }
+   },
+   "status": "optimal",
+   "objective": 566.8693625,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_5_zero",
+   "scenario": {
+    "gen_pmax_mw": {
+     "5": 0.0
+    }
+   },
+   "status": "optimal",
+   "objective": 574.364099305359,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    29
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "gen_pmax_5_half",
+   "scenario": {
+    "gen_pmax_mw": {
+     "5": 20.0
+    }
+   },
+   "status": "optimal",
+   "objective": 566.6112375,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_1_x2.0",
+   "scenario": {
+    "load_scale": {
+     "1": 2.0
+    }
+   },
+   "status": "optimal",
+   "objective": 651.07228125,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_1_x4.0",
+   "scenario": {
+    "load_scale": {
+     "1": 4.0
+    }
+   },
+   "status": "optimal",
+   "objective": 828.5798424156548,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_1_x8.0",
+   "scenario": {
+    "load_scale": {
+     "1": 8.0
+    }
+   },
+   "status": "optimal",
+   "objective": 17172.35892191405,
+   "total_shed": 15.99139027110653,
+   "shed_economic": 15.99139027110653,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    28,
+    29
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_2_x2.0",
+   "scenario": {
+    "load_scale": {
+     "2": 2.0
+    }
+   },
+   "status": "optimal",
+   "objective": 576.0454625000001,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_2_x4.0",
+   "scenario": {
+    "load_scale": {
+     "2": 4.0
+    }
+   },
+   "status": "optimal",
+   "objective": 594.3976625,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_2_x8.0",
+   "scenario": {
+    "load_scale": {
+     "2": 8.0
+    }
+   },
+   "status": "optimal",
+   "objective": 631.6441562499999,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_3_x2.0",
+   "scenario": {
+    "load_scale": {
+     "3": 2.0
+    }
+   },
+   "status": "optimal",
+   "objective": 595.9270125,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_3_x4.0",
+   "scenario": {
+    "load_scale": {
+     "3": 4.0
+    }
+   },
+   "status": "optimal",
+   "objective": 655.4722812499999,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_3_x8.0",
+   "scenario": {
+    "load_scale": {
+     "3": 8.0
+    }
+   },
+   "status": "optimal",
+   "objective": 778.6982819291585,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    2.842170943040401e-14
+   ],
+   "binding_lines": [
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_6_x2.0",
+   "scenario": {
+    "load_scale": {
+     "6": 2.0
+    }
+   },
+   "status": "optimal",
+   "objective": 655.4722812499999,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_6_x4.0",
+   "scenario": {
+    "load_scale": {
+     "6": 4.0
+    }
+   },
+   "status": "optimal",
+   "objective": 842.3225636651272,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_6_x8.0",
+   "scenario": {
+    "load_scale": {
+     "6": 8.0
+    }
+   },
+   "status": "optimal",
+   "objective": 22538.55100521425,
+   "total_shed": 21.349063242909715,
+   "shed_economic": 21.349063242909715,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    8,
+    26,
+    28,
+    29
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_7_x2.0",
+   "scenario": {
+    "load_scale": {
+     "7": 2.0
+    }
+   },
+   "status": "optimal",
+   "objective": 17455.17947971143,
+   "total_shed": 16.776901511322464,
+   "shed_economic": 16.776901511322464,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    9,
+    28,
+    29
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_7_x4.0",
+   "scenario": {
+    "load_scale": {
+     "7": 4.0
+    }
+   },
+   "status": "optimal",
+   "objective": 77455.1794797114,
+   "total_shed": 76.77690151132244,
+   "shed_economic": 76.77690151132244,
+   "n_islands": 1,
+   "per_island_balance": [
+    -2.842170943040401e-14
+   ],
+   "binding_lines": [
+    9,
+    28,
+    29
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_7_x8.0",
+   "scenario": {
+    "load_scale": {
+     "7": 8.0
+    }
+   },
+   "status": "optimal",
+   "objective": 197455.17947971143,
+   "total_shed": 196.77690151132248,
+   "shed_economic": 196.77690151132248,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    9,
+    28,
+    29
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_9_x2.0",
+   "scenario": {
+    "load_scale": {
+     "9": 2.0
+    }
+   },
+   "status": "optimal",
+   "objective": 589.0449375000001,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_9_x4.0",
+   "scenario": {
+    "load_scale": {
+     "9": 4.0
+    }
+   },
+   "status": "optimal",
+   "objective": 634.00665625,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_9_x8.0",
+   "scenario": {
+    "load_scale": {
+     "9": 8.0
+    }
+   },
+   "status": "optimal",
+   "objective": 727.8221642430004,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_11_x2.0",
+   "scenario": {
+    "load_scale": {
+     "11": 2.0
+    }
+   },
+   "status": "optimal",
+   "objective": 609.6911625000001,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_11_x4.0",
+   "scenario": {
+    "load_scale": {
+     "11": 4.0
+    }
+   },
+   "status": "optimal",
+   "objective": 699.0936605670103,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    29,
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_11_x8.0",
+   "scenario": {
+    "load_scale": {
+     "11": 8.0
+    }
+   },
+   "status": "optimal",
+   "objective": 905.3860899052057,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    29,
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_13_x2.0",
+   "scenario": {
+    "load_scale": {
+     "13": 2.0
+    }
+   },
+   "status": "optimal",
+   "objective": 590.5742875000001,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_13_x4.0",
+   "scenario": {
+    "load_scale": {
+     "13": 4.0
+    }
+   },
+   "status": "optimal",
+   "objective": 638.8364882728459,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    29
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "load_scale_13_x8.0",
+   "scenario": {
+    "load_scale": {
+     "13": 8.0
+    }
+   },
+   "status": "optimal",
+   "objective": 8431.599526518437,
+   "total_shed": 7.645064426694589,
+   "shed_economic": 7.645064426694589,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    19
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "combo_gens012_zero",
+   "scenario": {
+    "gen_pmax_mw": {
+     "0": 0.0,
+     "1": 0.0,
+     "2": 0.0
+    }
+   },
+   "status": "optimal",
+   "objective": 64676.4785,
+   "total_shed": 64.2,
+   "shed_economic": 64.2,
+   "n_islands": 1,
+   "per_island_balance": [
+    1.4210854715202004e-14
+   ],
+   "binding_lines": [
+    29,
+    34
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "combo_gens01_zero_load_x2",
+   "scenario": {
+    "gen_pmax_mw": {
+     "0": 0.0,
+     "1": 0.0
+    },
+    "load_scale": {
+     "1": 2.0
+    }
+   },
+   "status": "optimal",
+   "objective": 42485.6900868124,
+   "total_shed": 41.83121797727077,
+   "shed_economic": 41.83121797727077,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    26,
+    28,
+    29
+   ],
+   "pass_invariants": true,
+   "violations": []
+  },
+  {
+   "case_id": "combo_gen0_half_load_x4",
+   "scenario": {
+    "gen_pmax_mw": {
+     "0": 40.0
+    },
+    "load_scale": {
+     "2": 4.0
+    }
+   },
+   "status": "optimal",
+   "objective": 594.3976625,
+   "total_shed": 0.0,
+   "shed_economic": 0.0,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [],
+   "pass_invariants": true,
+   "violations": []
+  }
+ ]
+}

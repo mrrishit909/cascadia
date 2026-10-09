@@ -5,14 +5,16 @@ import { ScenarioReadout } from './ScenarioReadout'
 // CAS-INT-003. Pick a generator, lower its Pmax (0..rated), Apply -> Worker solve (gen_pmax_mw).
 export function ReduceGenerator() {
   const { state, setGenPmax } = useApp()
-  const { network, genPmax, pending, solve } = state
+  const { network, genPmax, pending, solve, epoch } = state
   const eff = pending?.genPmax ?? genPmax
   const [gen, setGen] = useState<number | null>(null)
   const [mw, setMw] = useState(0)
   const rated = gen === null || !network ? 0 : network.gens[gen].pmax_mw
+  // N2 fix (same bug class as AlterCapacity.tsx, reintroduced here): resync ONLY on generator selection
+  // change or an actual reset (epoch bump), not on every pending/genPmax change from unrelated controls.
   useEffect(() => { setMw(gen === null || !network ? 0 : eff[gen] ?? network.gens[gen].pmax_mw) },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [gen, genPmax, pending])
+    [gen, epoch])
   if (!network) return null
   return (
     <section aria-labelledby="rg-h">
