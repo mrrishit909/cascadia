@@ -86,15 +86,22 @@ three counts before any chapter code existed:
   its divergence condition is simply "has the user run at least one Compare" (`restoration.ranking !==
   null`), not a comparison against the main scenario's baseline at all.
 
-**Actual resolution:** each chapter's divergence check is a **named, chapter-scoped predicate** over
-only the fields that chapter's own control(s) can write, comparing against `state.baseline`'s value for
-those same fields (plain value equality on numbers/booleans/sorted-array-contents, never object
-identity):
-- Chapter 2: `state.loadScale !== baseline.loadScale (per-bus) || state.genPmax !== baseline.genPmax (per-gen)`
-- Chapter 3: `state.lineCapacity` has any key whose factor differs from 1, or `allowShed` differs from
-  its default
-- Chapter 4: `state.removedBus !== null || state.disabledLines.length > 0`
-- Chapter 5: `state.restoration.ranking !== null`
+**Actual resolution:** each chapter's divergence check is a **named, chapter-scoped predicate**, now
+implemented (not just prose) as pure functions in `src/app/chapterDivergence.ts` with a unit test
+covering the apply-then-revert-to-default case (`src/app/chapterDivergence.test.ts`): `chapter2Diverged`,
+`chapter3Diverged`, `chapter4Diverged`, `chapter5Diverged`. Each compares only the fields that chapter's
+own control(s) can write against the **literal default `Scen` values** (`removedBus: null,
+lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: []` -- the same defaults
+the `reset` reducer case in `state.tsx` restores), NOT `state.baseline` (that field holds the baseline
+RESULT object, a `Precomputed`, not a `Scen` -- comparing against it by identity is the exact bug this
+section originally had). `setLoadScale`/`setGenPmax`/`setCapacity` already delete a field's key once
+it's set back to its default, so an empty map/default scalar genuinely means "no live edit," with no
+identity pitfall:
+- Chapter 2 (`chapter2Diverged`): any key in `loadScale` or `genPmax`
+- Chapter 3 (`chapter3Diverged`): any key in `lineCapacity`, or `allowShed !== true`
+- Chapter 4 (`chapter4Diverged`): `removedBus !== null`, or any entry in `disabledLines`
+- Chapter 5 (`chapter5Diverged`): `restoration.ranking !== undefined` (diverged once a ranking exists,
+  including an empty one -- CAS-INT-006 is a separate subsystem with no `Scen` of its own)
 
 Each chapter shows ITS OWN story fixture until ITS OWN predicate is true, independent of every other
 chapter's state -- diverging chapter 3 never touches chapter 2's or chapter 4's displayed stage. Once a
@@ -103,6 +110,20 @@ the predicate becomes false again (user reset, or reversed their own edit back t
 returns to the story fixture and the label reverts. This keeps the rule from section 1 intact (the
 fixture transition itself is still not live-solved) while making a user's own action visibly take
 effect immediately, scoped to the chapter that actually owns it.
+
+**Readouts switch with the stage, not just the SVG.** Each of these chapters also has a text readout
+(`ScenarioReadout`/`RemoveNode`/`AlterCapacity`'s own paragraphs, `CompareRestoration`'s summary) that
+today always reads live `state.result`/`state.restoration` directly. Once a chapter can show a story
+fixture, its readout must read from the SAME source the stage is currently showing (fixture numbers in
+STORY mode, `state.result` in YOUR SCENARIO mode) -- otherwise the stage would show the story's network
+while the readout below it prints live numbers that don't match, which is worse than the single-source
+problem this section fixes. Not yet implemented; flag for whoever wires the chapter 2-5 story fixtures.
+
+**Open question, not yet resolved:** CAS-INT-004 (AddLine) has no home chapter in the table below --
+only chapter 6's lab hosts it. Confirmed this is what `docs/ART_DIRECTION.md`'s own chapter table says
+(not an omission introduced here); whoever builds the chapter shell should re-confirm this is
+intentional before treating it as settled, since every other control has exactly one home chapter plus
+the lab.
 
 ## 4. Chapter table (from `docs/ART_DIRECTION.md`, repeated here for a single reference point)
 
