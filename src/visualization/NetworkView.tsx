@@ -98,9 +98,25 @@ function busBrackets(key: string) {
   ))
 }
 
-interface Props { network: Case30; result: SolveResult; removedBus?: number | null; selectedBus?: number | null; onSelect?: (bus: number) => void; selectedLine?: number | null; onSelectLine?: (line: number) => void; alteredLines?: number[]; disabledLines?: number[]; onRestoreLine?: (line: number) => void; candidates?: CandidateLine[]; addedLines?: number[]; onToggleCandidate?: (pos: number) => void }
-export function NetworkView({ network, result, removedBus = null, selectedBus = null, onSelect, selectedLine = null, onSelectLine, alteredLines = [], disabledLines = [], onRestoreLine, candidates = [], addedLines = [], onToggleCandidate }: Props) {
+interface Props { network: Case30; result: SolveResult; removedBus?: number | null; selectedBus?: number | null; onSelect?: (bus: number) => void; selectedLine?: number | null; onSelectLine?: (line: number) => void; alteredLines?: number[]; disabledLines?: number[]; onRestoreLine?: (line: number) => void; candidates?: CandidateLine[]; addedLines?: number[]; onToggleCandidate?: (pos: number) => void
+  // docs/planning/cascadia/CHAPTER_ARCHITECTURE.md section 2: "one persistent stage" means the one
+  // CANONICAL interactive instance. Chapter 3's locator inset and chapter 5's mini networks are a
+  // separate presentational variant of the SAME lineVisual/color/glow logic, not a hand-rolled second
+  // copy that could drift -- interactive=false strips role/tabIndex/testid/focus-ring/selection-bracket
+  // treatment (an inset/mini has no hit targets, no keyboard nav, nothing to select) and marks the
+  // whole <svg> aria-hidden (decorative/informational only -- the one interactive stage is what AT
+  // users navigate; duplicating the same announcements across up to 4 simultaneous instances would be
+  // confusing noise, not help).
+  interactive?: boolean }
+export function NetworkView({ network, result, removedBus = null, selectedBus = null, onSelect, selectedLine = null, onSelectLine, alteredLines = [], disabledLines = [], onRestoreLine, candidates = [], addedLines = [], onToggleCandidate, interactive = true }: Props) {
   const reactId = useId()
+  const testid = interactive ? 'line' : 'mini-line'
+  const busTestid = interactive ? 'bus' : 'mini-bus'
+  const candTestid = interactive ? 'candidate-line' : 'mini-candidate-line'
+  // Spread onto a <g> to add role/tabIndex/handlers/aria-pressed only when interactive; {} otherwise.
+  const hit = (ariaLabel: string, ariaPressed: boolean, onClick: () => void, onKeyDown: (e: React.KeyboardEvent) => void) =>
+    interactive ? { role: 'button' as const, tabIndex: 0, 'aria-pressed': ariaPressed, 'aria-label': ariaLabel, style: { cursor: 'pointer' }, onClick, onKeyDown } : {}
+  const keyToClick = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn() } }
   // D2: when infeasible, result.flows/shed/islands are all empty (there is no dispatch), so the old code
   // fell through to "no flow -> grey, not shed -> served", rendering a network that looks fully healthy.
   // Every line/bus gets an explicit infeasible treatment instead -- never derived from an empty flows/shed
@@ -157,8 +173,8 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
     // line), and role="img" tells assistive tech to treat the whole subtree as a flat, non-interactive
     // picture -- a real WCAG 4.1.2 violation (axe-core's "nested-interactive" rule, serious impact),
     // found by a dedicated a11y audit (e2e/a11y.spec.ts) rather than assumed fixed by the rest of this pass.
-    <svg viewBox={`0 0 ${W} ${H}`} role="group"
-      aria-label={`IEEE case30 network, ${infeasible ? 'infeasible: no valid dispatch' : removedBus !== null ? `bus ${removedBus} removed` : 'baseline dispatch'}`}
+    <svg viewBox={`0 0 ${W} ${H}`} role={interactive ? 'group' : undefined} aria-hidden={interactive ? undefined : true}
+      aria-label={interactive ? `IEEE case30 network, ${infeasible ? 'infeasible: no valid dispatch' : removedBus !== null ? `bus ${removedBus} removed` : 'baseline dispatch'}` : undefined}
       style={{ background: '#080D13', width: '100%', fontFamily: "'Archivo Variable','Arial Narrow','Roboto Condensed',system-ui,sans-serif" }}>
       <style>{`.nf-ring{opacity:0;pointer-events:none}g[tabindex]:focus-visible>.nf-ring{opacity:1}`}</style>
       <defs>
@@ -188,23 +204,19 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           // Restorable (outaged, not merely adjacent to a removed bus) lines stay keyboard/click-interactive
           // so a line taken out via LineOutage can be put back from the SVG, not only its <select>.
           // networkEncoding.removedElement: deEnergized stroke, dash "1 3" -- fault red means ONLY infeasible.
-          if (dead && outaged) return <g key={l.idx} data-testid="line" data-line={l.idx} data-outaged="true"
-            role="button" tabIndex={0} aria-pressed={false} style={{ cursor: 'pointer' }}
-            aria-label={`Line ${l.idx}, out of service. Press Enter to restore.`}
-            onClick={() => onRestoreLine?.(l.idx)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRestoreLine?.(l.idx) } }}>
+          if (dead && outaged) return <g key={l.idx} data-testid={testid} data-line={l.idx} data-outaged="true"
+            {...hit(`Line ${l.idx}, out of service. Press Enter to restore.`, false, () => onRestoreLine?.(l.idx), keyToClick(() => onRestoreLine?.(l.idx)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={DE_ENERGIZED} strokeWidth={1} strokeDasharray="1 3" opacity={0.6} />
-            {lineFocusRing(a.x, a.y, b.x, b.y, 0.5)}
+            {interactive && lineFocusRing(a.x, a.y, b.x, b.y, 0.5)}
           </g>
-          if (dead) return <line key={l.idx} data-testid="line" data-line={l.idx} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={DE_ENERGIZED} strokeWidth={1} strokeDasharray="1 3" opacity={0.6} />
-          if (infeasible) return <g key={l.idx} data-testid="line" data-line={l.idx} data-binding="n/a" data-altered={alteredLines.includes(l.idx)}
-            role="button" tabIndex={0} aria-pressed={selectedLine === l.idx} style={{ cursor: 'pointer' }}
-            aria-label={`Line ${l.idx}, flow n/a (infeasible). Press Enter to select for capacity.`}
-            onClick={() => onSelectLine?.(l.idx)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectLine?.(l.idx) } }}>
+          if (dead) return <line key={l.idx} data-testid={testid} data-line={l.idx} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={DE_ENERGIZED} strokeWidth={1} strokeDasharray="1 3" opacity={0.6} />
+          if (infeasible) return <g key={l.idx} data-testid={testid} data-line={l.idx} data-binding="n/a" data-altered={alteredLines.includes(l.idx)}
+            {...hit(`Line ${l.idx}, flow n/a (infeasible). Press Enter to select for capacity.`, selectedLine === l.idx, () => onSelectLine?.(l.idx), keyToClick(() => onSelectLine?.(l.idx)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={FAULT} strokeWidth={1.5} strokeDasharray="2 3" opacity={0.5} />
-            {lineFocusRing(a.x, a.y, b.x, b.y, 0.75)}
-            {selectedLine === l.idx && lineBrackets(a.x, a.y, b.x, b.y, `sel-inf-${l.idx}`)}
+            {interactive && lineFocusRing(a.x, a.y, b.x, b.y, 0.75)}
+            {interactive && selectedLine === l.idx && lineBrackets(a.x, a.y, b.x, b.y, `sel-inf-${l.idx}`)}
           </g>
           const f = Math.abs(result.flows[l.idx] ?? 0)
           // binding comes from the Worker's binding_lines, never computed here.
@@ -214,17 +226,15 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           const deEnergized = noGen.has(l.from_bus) || noGen.has(l.to_bus)
           const v = lineVisual(f, rating, binding, deEnergized)
           const width = 1 + 4 * f / maxFlow
-          return <g key={l.idx} data-testid="line" data-line={l.idx} data-binding={binding ? 'binding' : 'slack'}
-            data-altered={alteredLines.includes(l.idx)} role="button" tabIndex={0} aria-pressed={sel} style={{ cursor: 'pointer' }}
-            aria-label={`Line ${l.idx}, ${binding ? 'binding' : 'slack'}, ${f.toFixed(2)} of ${rating.toFixed(2)} MW. Press Enter to select for capacity.`}
-            onClick={() => onSelectLine?.(l.idx)}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectLine?.(l.idx) } }}>
+          return <g key={l.idx} data-testid={testid} data-line={l.idx} data-binding={binding ? 'binding' : 'slack'}
+            data-altered={alteredLines.includes(l.idx)}
+            {...hit(`Line ${l.idx}, ${binding ? 'binding' : 'slack'}, ${f.toFixed(2)} of ${rating.toFixed(2)} MW. Press Enter to select for capacity.`, sel, () => onSelectLine?.(l.idx), keyToClick(() => onSelectLine?.(l.idx)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             {/* networkEncoding.bindingLine: copperHot core with a copper casing either side (double rule) */}
             {v.casing && <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={v.casing} strokeWidth={width + 2} strokeLinecap="round" />}
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={v.stroke} strokeWidth={width} strokeLinecap="round" strokeDasharray={v.dash} />
-            {lineFocusRing(a.x, a.y, b.x, b.y, width / 2 + (v.casing ? 1 : 0))}
-            {sel && lineBrackets(a.x, a.y, b.x, b.y, `sel-${l.idx}`)}
+            {interactive && lineFocusRing(a.x, a.y, b.x, b.y, width / 2 + (v.casing ? 1 : 0))}
+            {interactive && sel && lineBrackets(a.x, a.y, b.x, b.y, `sel-${l.idx}`)}
           </g>
         })}
       </g>
@@ -237,21 +247,17 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           const idx = network.lines.length + k
           const a = pos[cl.from_bus], b = pos[cl.to_bus]
           const added = addedLines.includes(k)
-          if (!added) return <g key={`cand-${k}`} data-testid="candidate-line" data-candidate={k} data-added="false"
-            role="button" tabIndex={0} aria-pressed={false} style={{ cursor: 'pointer' }}
-            aria-label={`Candidate line ${k} (${network.buses[cl.from_bus].name}-${network.buses[cl.to_bus].name}), not added. Press Enter to add.`}
-            onClick={() => onToggleCandidate?.(k)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleCandidate?.(k) } }}>
+          if (!added) return <g key={`cand-${k}`} data-testid={candTestid} data-candidate={k} data-added="false"
+            {...hit(`Candidate line ${k} (${network.buses[cl.from_bus].name}-${network.buses[cl.to_bus].name}), not added. Press Enter to add.`, false, () => onToggleCandidate?.(k), keyToClick(() => onToggleCandidate?.(k)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={DIAGNOSTIC_DIM} strokeWidth={1} strokeDasharray="6 4" opacity={0.35} />
-            {lineFocusRing(a.x, a.y, b.x, b.y, 0.5)}
+            {interactive && lineFocusRing(a.x, a.y, b.x, b.y, 0.5)}
           </g>
-          if (infeasible) return <g key={`cand-${k}`} data-testid="candidate-line" data-candidate={k} data-added="true"
-            role="button" tabIndex={0} aria-pressed={false} style={{ cursor: 'pointer' }}
-            aria-label={`Candidate line ${k}, flow n/a (infeasible). Press Enter to remove.`}
-            onClick={() => onToggleCandidate?.(k)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleCandidate?.(k) } }}>
+          if (infeasible) return <g key={`cand-${k}`} data-testid={candTestid} data-candidate={k} data-added="true"
+            {...hit(`Candidate line ${k}, flow n/a (infeasible). Press Enter to remove.`, false, () => onToggleCandidate?.(k), keyToClick(() => onToggleCandidate?.(k)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={FAULT} strokeWidth={1.5} strokeDasharray="2 3" opacity={0.5} />
-            {lineFocusRing(a.x, a.y, b.x, b.y, 0.75)}
+            {interactive && lineFocusRing(a.x, a.y, b.x, b.y, 0.75)}
           </g>
           const f = Math.abs(result.flows[idx] ?? 0)
           const binding = result.binding_lines.includes(idx)
@@ -261,14 +267,12 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           const deEnergizedCand = cl.from_bus === removedBus || cl.to_bus === removedBus || noGen.has(cl.from_bus) || noGen.has(cl.to_bus)
           const v = lineVisual(f, rating, binding, deEnergizedCand)
           const width = 1 + 4 * f / maxFlow
-          return <g key={`cand-${k}`} data-testid="candidate-line" data-candidate={k} data-added="true" data-binding={binding ? 'binding' : 'slack'}
-            role="button" tabIndex={0} aria-pressed={false} style={{ cursor: 'pointer' }}
-            aria-label={`Candidate line ${k} (added), ${binding ? 'binding' : 'slack'}, ${f.toFixed(2)} of ${rating.toFixed(2)} MW. Press Enter to remove.`}
-            onClick={() => onToggleCandidate?.(k)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleCandidate?.(k) } }}>
+          return <g key={`cand-${k}`} data-testid={candTestid} data-candidate={k} data-added="true" data-binding={binding ? 'binding' : 'slack'}
+            {...hit(`Candidate line ${k} (added), ${binding ? 'binding' : 'slack'}, ${f.toFixed(2)} of ${rating.toFixed(2)} MW. Press Enter to remove.`, false, () => onToggleCandidate?.(k), keyToClick(() => onToggleCandidate?.(k)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             {v.casing && <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={v.casing} strokeWidth={width + 2} strokeLinecap="round" />}
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={v.stroke} strokeWidth={width} strokeLinecap="round" strokeDasharray={v.dash} />
-            {lineFocusRing(a.x, a.y, b.x, b.y, width / 2 + (v.casing ? 1 : 0))}
+            {interactive && lineFocusRing(a.x, a.y, b.x, b.y, width / 2 + (v.casing ? 1 : 0))}
           </g>
         })}
       </g>
@@ -276,13 +280,11 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
         {network.buses.map(b => {
           const removed = b.idx === removedBus
           if (!removed && infeasible) {
-            return <g key={b.idx} data-testid="bus" data-bus={b.idx} data-state="infeasible" transform={`translate(${pos[b.idx].x} ${pos[b.idx].y})`}
-              role="button" tabIndex={0} aria-pressed={selectedBus === b.idx} style={{ cursor: 'pointer' }}
-              aria-label={`Bus ${b.name}, status n/a (infeasible). Press Enter to select for removal.`}
-              onClick={() => onSelect?.(b.idx)} onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(b.idx) } }}>
+            return <g key={b.idx} data-testid={busTestid} data-bus={b.idx} data-state="infeasible" transform={`translate(${pos[b.idx].x} ${pos[b.idx].y})`}
+              {...hit(`Bus ${b.name}, status n/a (infeasible). Press Enter to select for removal.`, selectedBus === b.idx, () => onSelect?.(b.idx), keyToClick(() => onSelect?.(b.idx)))}>
               <circle r={7} fill={INK} stroke={FAULT} strokeWidth={2} strokeDasharray="2 2" />
-              {selectedBus === b.idx && busBrackets(`sel-${b.idx}`)}
-              {busFocusRing()}
+              {interactive && selectedBus === b.idx && busBrackets(`sel-${b.idx}`)}
+              {interactive && busFocusRing()}
               <text y={-15} textAnchor="middle" fontSize={11} fill="#9AA5B1">{b.name}</text>
             </g>
           }
@@ -292,16 +294,13 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           // Removed bus, like removed/outaged lines: deEnergized, not fault red -- fault red means ONLY infeasible.
           const stroke = removed ? DE_ENERGIZED : state === 'served' ? COPPER : DIAGNOSTIC
           return (
-            <g key={b.idx} data-testid="bus" data-bus={b.idx} data-state={state} transform={`translate(${pos[b.idx].x} ${pos[b.idx].y})`}
-              role="button" tabIndex={0} aria-pressed={selectedBus === b.idx} style={{ cursor: 'pointer' }}
-              aria-label={`Bus ${b.name}, ${state.replace(/_/g, ' ')}. Press Enter to select for removal.`}
-              onClick={() => onSelect?.(b.idx)}
-              onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(b.idx) } }}>
+            <g key={b.idx} data-testid={busTestid} data-bus={b.idx} data-state={state} transform={`translate(${pos[b.idx].x} ${pos[b.idx].y})`}
+              {...hit(`Bus ${b.name}, ${state.replace(/_/g, ' ')}. Press Enter to select for removal.`, selectedBus === b.idx, () => onSelect?.(b.idx), keyToClick(() => onSelect?.(b.idx)))}>
               <circle r={7} fill={isolated ? DIAGNOSTIC_DIM : INK} stroke={stroke} strokeWidth={2}
                 strokeDasharray={isolated ? '3 2' : undefined} />
               {removed && <path d="M-5-5L5 5M5-5L-5 5" stroke={stroke} strokeWidth={2} />}
-              {selectedBus === b.idx && busBrackets(`sel-${b.idx}`)}
-              {busFocusRing()}
+              {interactive && selectedBus === b.idx && busBrackets(`sel-${b.idx}`)}
+              {interactive && busFocusRing()}
               <text y={-15} textAnchor="middle" fontSize={11} fill="#9AA5B1">{b.name}</text>
             </g>
           )
