@@ -1,6 +1,6 @@
 // Main-thread client with latest-wins cancellation. The worker itself cannot interrupt a running
 // synchronous solve, so a superseded request is still computed but its result is never delivered.
-import type { DcopfResult, ScenarioParams } from '../engine/dcopf'
+import type { CandidateLine, DcopfResult, ScenarioParams } from '../engine/dcopf'
 import type { Case30 } from '../engine/types'
 import type { LpReply, LpRequest } from './lpWorker'
 
@@ -17,10 +17,10 @@ export function createLpClient(worker: WorkerLike) {
     if (data.ok) p.res(data.result); else p.rej(new Error(data.error))
   }
   return {
-    solve(c: Case30, scenario: ScenarioParams = {}): Promise<DcopfResult> {
+    solve(c: Case30, scenario: ScenarioParams = {}, candidates?: CandidateLine[]): Promise<DcopfResult> {
       const id = ++latest
       for (const [oid, p] of pending) { p.rej(new SupersededError()); pending.delete(oid) }
-      return new Promise((res, rej) => { pending.set(id, { res, rej }); worker.postMessage({ id, case: c, scenario }) })
+      return new Promise((res, rej) => { pending.set(id, { res, rej }); worker.postMessage({ id, case: c, scenario, candidates }) })
     },
   }
 }

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type Dispatch, type ReactNode } from 'react'
-import type { DcopfResult, ScenarioParams } from '../engine/dcopf'
+import type { CandidateLine, DcopfResult, ScenarioParams } from '../engine/dcopf'
 import { createLpClient, SupersededError } from '../workers/lpClient'
 import type { Case30, Precomputed, Scenario } from '../engine/types'
 
@@ -39,9 +39,12 @@ import type { Case30, Precomputed, Scenario } from '../engine/types'
 // They follow the exact same rules as lineCapacity: read from base(), written to pendingRef synchronously,
 // promoted by 'solved', cleared by 'reset'. Every action spreads `...prior` so it can never drop a field
 // it doesn't own, and every solve builds its request through params() so none can be omitted from a request.
-export interface Scen { removedBus: number | null; lineCapacity: Record<number, number>; allowShed: boolean; loadScale: Record<number, number>; genPmax: Record<number, number>; disabledLines: number[] }
+// CAS-INT-004 adds addedLines (candidate-line positions, see candidate_lines.json's own idx convention).
+// Same rules as disabledLines: read from base(), written to pendingRef synchronously, promoted by
+// 'solved', cleared by 'reset'.
+export interface Scen { removedBus: number | null; lineCapacity: Record<number, number>; allowShed: boolean; loadScale: Record<number, number>; genPmax: Record<number, number>; disabledLines: number[]; addedLines: number[] }
 export const params = (s: Scen): ScenarioParams => ({ line_capacity_factor: s.lineCapacity, allow_shed: s.allowShed,
-  load_scale: s.loadScale, gen_pmax_mw: s.genPmax, disabled_lines: s.disabledLines,
+  load_scale: s.loadScale, gen_pmax_mw: s.genPmax, disabled_lines: s.disabledLines, added_lines: s.addedLines,
   ...(s.removedBus !== null && { removed_buses: [s.removedBus] }) })
 export interface AppState {
   load: 'loading' | 'ready' | 'error'
@@ -59,6 +62,8 @@ export interface AppState {
   loadScale: Record<number, number>
   genPmax: Record<number, number>
   disabledLines: number[]
+  addedLines: number[]
+  candidates: CandidateLine[] // CAS-INT-004 candidate lines, fetched once at init
   selectedLine: number | null
   pending: Scen | null // scenario intent of the in-flight solve, if any
   // Bumped by 'reset'. lpClient's SupersededError only fires when a NEW solve()
@@ -73,7 +78,7 @@ export interface AppState {
   epoch: number
 }
 export type Action =
-  | { type: 'loaded'; scenario: Scenario; network: Case30; result: Precomputed }
+  | { type: 'loaded'; scenario: Scenario; network: Case30; result: Precomputed; candidates: CandidateLine[] }
   | { type: 'failed'; error: string }
   | { type: 'solved'; result: Precomputed; scenario: Scen }
   | { type: 'selectLine'; line: number | null }
@@ -82,30 +87,30 @@ export type Action =
   | { type: 'solveFailed'; error: string }
   | { type: 'reset' }
 
-const initial: AppState = { load: 'loading', removedBus: null, selectedBus: null, solve: 'idle', lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], selectedLine: null, pending: null, epoch: 0 }
+const initial: AppState = { load: 'loading', removedBus: null, selectedBus: null, solve: 'idle', lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], addedLines: [], candidates: [], selectedLine: null, pending: null, epoch: 0 }
 
 function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
-    case 'loaded': return { ...s, load: 'ready', scenario: a.scenario, network: a.network, result: a.result, baseline: a.result }
+    case 'loaded': return { ...s, load: 'ready', scenario: a.scenario, network: a.network, result: a.result, baseline: a.result, candidates: a.candidates }
     case 'failed': return { ...s, load: 'error', error: a.error }
-    case 'solved': return { ...s, result: a.result, removedBus: a.scenario.removedBus, lineCapacity: a.scenario.lineCapacity, allowShed: a.scenario.allowShed, loadScale: a.scenario.loadScale, genPmax: a.scenario.genPmax, disabledLines: a.scenario.disabledLines, pending: null, selectedBus: null, solve: 'idle', solveError: undefined }
+    case 'solved': return { ...s, result: a.result, removedBus: a.scenario.removedBus, lineCapacity: a.scenario.lineCapacity, allowShed: a.scenario.allowShed, loadScale: a.scenario.loadScale, genPmax: a.scenario.genPmax, disabledLines: a.scenario.disabledLines, addedLines: a.scenario.addedLines, pending: null, selectedBus: null, solve: 'idle', solveError: undefined }
     case 'selectLine': return { ...s, selectedLine: a.line }
     case 'select': return { ...s, selectedBus: a.bus }
     case 'solving': return { ...s, solve: 'solving', solveError: undefined, pending: a.scenario }
     case 'solveFailed': return { ...s, solve: 'error', solveError: a.error, pending: null }
-    case 'reset': return { ...s, result: s.baseline, removedBus: null, lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], selectedLine: null, selectedBus: null, solve: 'idle', solveError: undefined, pending: null, epoch: s.epoch + 1 }
+    case 'reset': return { ...s, result: s.baseline, removedBus: null, lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], addedLines: [], selectedLine: null, selectedBus: null, solve: 'idle', solveError: undefined, pending: null, epoch: s.epoch + 1 }
   }
 }
 
-export type Solver = (c: Case30, sc: ScenarioParams) => Promise<DcopfResult>
-const Ctx = createContext<{ state: AppState; dispatch: Dispatch<Action>; removeBus: (bus: number) => Promise<void>; setCapacity: (line: number, factor: number, allowShed: boolean) => Promise<void>; setLoadScale: (bus: number, factor: number) => Promise<void>; setGenPmax: (gen: number, mw: number | null) => Promise<void>; setLineOutage: (line: number, out: boolean) => Promise<void> } | null>(null)
+export type Solver = (c: Case30, sc: ScenarioParams, cands?: CandidateLine[]) => Promise<DcopfResult>
+const Ctx = createContext<{ state: AppState; dispatch: Dispatch<Action>; removeBus: (bus: number) => Promise<void>; setCapacity: (line: number, factor: number, allowShed: boolean) => Promise<void>; setLoadScale: (bus: number, factor: number) => Promise<void>; setGenPmax: (gen: number, mw: number | null) => Promise<void>; setLineOutage: (line: number, out: boolean) => Promise<void>; setAddedLine: (pos: number, added: boolean) => Promise<void> } | null>(null)
 
 // Real Worker, created lazily on first solve.
 function workerSolver(): Solver {
   let client: ReturnType<typeof createLpClient> | undefined
-  return (c, sc) => {
+  return (c, sc, cands) => {
     client ??= createLpClient(new Worker(new URL('../workers/lpWorker.ts', import.meta.url), { type: 'module' }) as never)
-    return client.solve(c, sc)
+    return client.solve(c, sc, cands)
   }
 }
 export const useApp = () => {
@@ -133,11 +138,12 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
     (async () => {
       try {
         const scenario = await get<Scenario>('scenarios/baseline.json')
-        const [network, result] = await Promise.all([
+        const [network, result, candFile] = await Promise.all([
           get<Case30>(scenario.case),
           get<Precomputed>('precomputed/baseline.json'),
+          get<{ lines: CandidateLine[] }>('raw-metadata/candidate_lines.json'),
         ])
-        dispatch({ type: 'loaded', scenario, network, result })
+        dispatch({ type: 'loaded', scenario, network, result, candidates: candFile.lines })
       } catch (e) {
         dispatch({ type: 'failed', error: String(e) })
       }
@@ -150,8 +156,8 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
   // written synchronously at each call site below), not state.pending
   // (rendered, can lag by one render -- N3). This is the D1/N1/N3 fix -- see
   // the AppState comment above.
-  const base = useCallback((): Scen => pendingRef.current ?? { removedBus: state.removedBus, lineCapacity: state.lineCapacity, allowShed: state.allowShed, loadScale: state.loadScale, genPmax: state.genPmax, disabledLines: state.disabledLines },
-    [state.removedBus, state.lineCapacity, state.allowShed, state.loadScale, state.genPmax, state.disabledLines])
+  const base = useCallback((): Scen => pendingRef.current ?? { removedBus: state.removedBus, lineCapacity: state.lineCapacity, allowShed: state.allowShed, loadScale: state.loadScale, genPmax: state.genPmax, disabledLines: state.disabledLines, addedLines: state.addedLines },
+    [state.removedBus, state.lineCapacity, state.allowShed, state.loadScale, state.genPmax, state.disabledLines, state.addedLines])
   const removeBus = useCallback(async (bus: number) => {
     if (!state.network) return
     const myEpoch = epochRef.current
@@ -160,7 +166,7 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
     pendingRef.current = scenario // synchronous: must be visible to the very next base() call, not just after re-render
     dispatch({ type: 'solving', scenario })
     try {
-      const r = await solve(state.network, params(scenario))
+      const r = await solve(state.network, params(scenario), state.candidates)
       if (epochRef.current !== myEpoch) return // reset happened while this solve was in flight; discard
       dispatch({ type: 'solved', scenario, result: {
         id: `bus_removal_${bus}`, label: `Live HiGHS Worker solve: bus ${bus} removed (island-aware DC-OPF)${scenario.allowShed ? '' : ', shedding disabled'}`,
@@ -169,7 +175,7 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
       if (epochRef.current !== myEpoch) return
       if (!(e instanceof SupersededError)) dispatch({ type: 'solveFailed', error: e instanceof Error ? e.message : String(e) })
     }
-  }, [solve, state.network, state.baseline, base])
+  }, [solve, state.network, state.baseline, state.candidates, base])
   // CAS-INT-005: real Worker solve with one line's capacity factor changed (factor 1 = baseline rating).
   // Other lines' factors and any removed bus stay applied -- built from the pending intent (base()), not
   // the last-confirmed state, so a removal still awaiting its solve is never silently dropped (D1). The
@@ -185,7 +191,7 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
     pendingRef.current = scenario
     dispatch({ type: 'solving', scenario })
     try {
-      const r = await solve(state.network, params(scenario))
+      const r = await solve(state.network, params(scenario), state.candidates)
       if (epochRef.current !== myEpoch) return // reset happened while this solve was in flight; discard
       dispatch({ type: 'solved', scenario, result: {
         id: `line_capacity_${line}_x${factor}`, label: `Live HiGHS Worker solve: line ${line} capacity x${factor}${allowShed ? '' : ', shedding disabled'}`,
@@ -194,8 +200,8 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
       if (epochRef.current !== myEpoch) return
       if (!(e instanceof SupersededError)) dispatch({ type: 'solveFailed', error: e instanceof Error ? e.message : String(e) })
     }
-  }, [solve, state.network, state.baseline, base])
-  // Shared by the three CAS-INT-002/003/007 actions: same epoch/pendingRef/SupersededError handling as above.
+  }, [solve, state.network, state.baseline, state.candidates, base])
+  // Shared by the four CAS-INT-002/003/004/007 actions: same epoch/pendingRef/SupersededError handling as above.
   const runScen = useCallback(async (next: (prior: Scen) => Scen, id: string, label: string) => {
     if (!state.network) return
     const myEpoch = epochRef.current
@@ -203,7 +209,7 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
     pendingRef.current = scenario
     dispatch({ type: 'solving', scenario })
     try {
-      const r = await solve(state.network, params(scenario))
+      const r = await solve(state.network, params(scenario), state.candidates)
       if (epochRef.current !== myEpoch) return
       dispatch({ type: 'solved', scenario, result: { id, label: `Live HiGHS Worker solve: ${label}${scenario.allowShed ? '' : ', shedding disabled'}`,
         limitations: state.baseline?.limitations ?? [], result: r } })
@@ -211,7 +217,7 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
       if (epochRef.current !== myEpoch) return
       if (!(e instanceof SupersededError)) dispatch({ type: 'solveFailed', error: e instanceof Error ? e.message : String(e) })
     }
-  }, [solve, state.network, state.baseline, base])
+  }, [solve, state.network, state.baseline, state.candidates, base])
   const setLoadScale = useCallback((bus: number, f: number) => runScen(p => {
     const loadScale = { ...p.loadScale }
     if (f === 1) delete loadScale[bus]; else loadScale[bus] = f
@@ -226,5 +232,10 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
   const setLineOutage = useCallback((line: number, out: boolean) => runScen(p => ({
     ...p, disabledLines: out ? [...new Set([...p.disabledLines, line])].sort((a, b) => a - b) : p.disabledLines.filter(l => l !== line),
   }), `line_outage_${line}`, `line ${line} ${out ? 'outage' : 'restored'}`), [runScen])
-  return <Ctx.Provider value={{ state, dispatch, removeBus, setCapacity, setLoadScale, setGenPmax, setLineOutage }}>{children}</Ctx.Provider>
+  // CAS-INT-004: pos is a candidate-line POSITION (0-based index into state.candidates), not an absolute
+  // line idx -- matches candidate_lines.json's own convention and dcopf.ts's added_lines scenario field.
+  const setAddedLine = useCallback((pos: number, added: boolean) => runScen(p => ({
+    ...p, addedLines: added ? [...new Set([...p.addedLines, pos])].sort((a, b) => a - b) : p.addedLines.filter(k => k !== pos),
+  }), `add_line_${pos}`, `candidate line ${pos} ${added ? 'added' : 'removed'}`), [runScen])
+  return <Ctx.Provider value={{ state, dispatch, removeBus, setCapacity, setLoadScale, setGenPmax, setLineOutage, setAddedLine }}>{children}</Ctx.Provider>
 }

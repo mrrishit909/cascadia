@@ -54,9 +54,10 @@ requirements:
     then: "the graph is recomputed and new routing/flow is shown"
     behavior: "add line"
     owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
-    verification: ["unit:n1_parity_sweep", "e2e:cas_line_add"]
-    status: unstarted
-    evidence_paths: []
+    verification: ["unit:add_line_restoration_parity", "e2e:addLine.spec.ts"]
+    status: implemented
+    evidence_paths: ["src/interactions/AddLine.tsx", "tests/unit/addLineRestorationParity.test.ts", "verification/REFERENCE_RESULTS/add_line_restoration.json", "e2e/addLine.spec.ts"]
+    note: "Worker plumbing extended (LpRequest/lpClient/lpWorker/state.tsx) to carry the 5 SYNTHETIC candidate lines end to end, not just in the Python oracle/TS engine. 24-case oracle parity (add_line_restoration.json, part of the same file as INT-006's restoration ranking). Rendered in NetworkView.tsx as a distinct accent color, click/keyboard-toggleable directly from the SVG or the control's own list. 6 e2e tests: real-oracle-matched flow value, SVG round-trip, D1 (combined with CAS-INT-001's removal), N1 (allowShed), reset-during-solve, N2-class (addedLines survives an unrelated solve). Not yet independently reviewed."
   - id: CAS-INT-005
     project: "CASCADIA"
     priority: P0
@@ -135,7 +136,7 @@ requirements:
     verification: ["e2e: all CAS-INT-00N tests"]
     status: in progress
     evidence_paths: ["e2e/cas_substation_remove_keyboard.spec.ts", "e2e/concurrency.spec.ts"]
-    note: "2 of 6 P0 controls (CAS-INT-001, CAS-INT-005) built, keyboard-tested, and independently adversarially reviewed -- prototype scope, see docs/planning/cascadia/PROTOTYPE_ACCEPTANCE_CRITERIA.md. CAS-INT-002/003/007 now implemented with e2e coverage including dedicated keyboard-only tests (e2e/newControls.spec.ts); CAS-INT-004/006 still unstarted at the UI level. Known tooling gap, confirmed directly (not assumed): headless Chromium does not change a native <select>'s value in response to synthetic ArrowDown or typeahead key events (Playwright's own docs recommend selectOption for this reason), so the keyboard-only tests use selectOption for the <select> itself and real keyboard for every slider/checkbox/button -- a native select IS keyboard-operable for a real user via the browser's own OS-rendered dropdown, this is a test-tool constraint, not an app accessibility gap, but it means e2e cannot independently prove select-element keyboard operability the way it proves every other control element. This gate cannot move past 'in progress' until all 6 P0 controls exist."
+    note: "2 of 6 P0 controls (CAS-INT-001, CAS-INT-005) built, keyboard-tested, and independently adversarially reviewed -- prototype scope, see docs/planning/cascadia/PROTOTYPE_ACCEPTANCE_CRITERIA.md. CAS-INT-002/003/004/007 now implemented with e2e coverage (e2e/newControls.spec.ts, e2e/addLine.spec.ts); CAS-INT-004's control (AddLine.tsx, button list, no <select>) is fully keyboard-only tested with no tooling caveat. CAS-INT-006 still unstarted at the UI level. Known tooling gap for the <select>-based controls, confirmed directly (not assumed): headless Chromium does not change a native <select>'s value in response to synthetic ArrowDown or typeahead key events (Playwright's own docs recommend selectOption for this reason), so those tests use selectOption for the <select> itself and real keyboard for every slider/checkbox/button -- a native select IS keyboard-operable for a real user via the browser's own OS-rendered dropdown, this is a test-tool constraint, not an app accessibility gap, but it means e2e cannot independently prove select-element keyboard operability the way it proves every other control element. This gate cannot move past 'in progress' until all 6 P0 controls exist."
   - id: CAS-MOTION-001
     project: "CASCADIA"
     priority: P0

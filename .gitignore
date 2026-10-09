@@ -14,3 +14,4 @@ automation/RUNNER_PID
 .venv/
 __pycache__/
 .pytest_cache/
+.claude/worktrees/
