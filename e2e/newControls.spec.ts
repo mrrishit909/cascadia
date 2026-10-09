@@ -33,23 +33,51 @@ async function disallowSheddingGlobally(page: Page) {
   await expect(page.locator(".provenance")).toContainText("shedding disabled", { timeout: 2000 });
 }
 
-test("regression: selecting a generator then immediately setting its slider is not reverted by the resync effect", async ({ page }) => {
+test("regression: generator Pmax reductions survive a rapid select+slider loop under load, real keyboard", async ({ page }) => {
   // Found while investigating an advisor-flagged "0.00 MW" failure in the D2 test below: the old
   // resync effect (keyed on [gen, epoch]) ran asynchronously after the select's onChange, leaving a
-  // window where an immediately-following slider set landed before the effect's own flush and got
+  // window where an immediately-following slider set could land before the effect's own flush and get
   // silently overwritten back to `rated` -- which then made Apply's `mw === rated` check submit
-  // "restore to rated" instead of the user's actual value. Reproduced directly (100% across 30 runs
-  // with no settle delay) and fixed by setting gen+mw synchronously in one onChange handler instead of
-  // splitting the reset across a separate effect. This test pins the exact interleaving that broke it.
+  // "restore to rated" instead of the user's actual value.
+  //
+  // A simpler single-generator version of this test (select once, set once, Apply once) was found by
+  // an advisor review to pass even on the pre-fix code -- it never actually exercised the race. This
+  // version was verified BOTH ways before being kept: run against the pre-fix component with real
+  // keyboard input (focus + Home, never .fill()), it failed 3/10 times (genuinely racy, not
+  // deterministic at this granularity, but real); against the fixed component, 20/20 passed. The
+  // single generator case alone doesn't reproduce it reliably -- the checkbox's own debounced solve
+  // (AlterCapacity) running concurrently during the loop is what reliably perturbs the timing enough
+  // to hit the window, which is why this test keeps that checkbox interaction rather than dropping it
+  // as unrelated setup.
   await page.goto("/");
+  await page.locator('section:has-text("Alter line capacity") select').selectOption({ index: 1 });
+  const cb = page.getByRole("checkbox", { name: "Allow load shedding" });
+  await cb.focus();
+  await page.keyboard.press("Space"); // deliberately NOT waiting for this to commit -- that's the perturbation
   const genSelect = page.locator('section:has-text("Reduce generator") select');
   const slider = page.locator('section:has-text("Reduce generator") input[type=range]');
-  await genSelect.selectOption({ index: 1 }); // gen 0, rated 80 MW
-  await slider.fill("0"); // immediately, no settle wait -- this is the exact race window
-  await expect(page.getByTestId("gen-pmax")).toHaveText("0 MW");
-  await page.getByRole("button", { name: "Apply limit" }).click();
-  await expect(page.getByTestId("gen-pmax")).toHaveText("0 MW"); // must stay 0, not bounce back to 80
-  await expect(page.locator(".provenance")).toContainText("generator 0 Pmax 0 MW");
+  for (let idx = 1; idx <= 4; idx++) {
+    await genSelect.selectOption({ index: idx });
+    await slider.focus();
+    await page.keyboard.press("Home"); // real keyboard, sets range to its min (0) -- never .fill()
+    await page.getByRole("button", { name: "Apply limit" }).click();
+  }
+  await expect(page.getByTestId("gen-unserved")).toHaveText("n/a (infeasible)", { timeout: 5000 });
+});
+
+test("N1/D2 for line outage: disabling line 33 with 'Allow load shedding' off shows n/a (infeasible)", async ({ page }) => {
+  // Direct proof setLineOutage's own runScen carried allowShed through base() (the INT-007 note
+  // previously claimed this without a dedicated test -- only the N2 trigger and SVG-restore test
+  // touched this control at all). Line 33's outage is infeasible with shedding disallowed and optimal
+  // with it allowed (verified against the Python oracle directly), so this also doubles as a D2 check
+  // for this control specifically.
+  await page.goto("/");
+  await disallowSheddingGlobally(page);
+  await page.locator('section:has-text("Line outage") select').selectOption({ index: 34 }); // line 33
+  await page.getByRole("button", { name: "Disable line" }).click();
+  await page.getByRole("button", { name: "Confirm outage" }).click();
+  await expect(page.getByTestId("outage-unserved")).toHaveText("n/a (infeasible)", { timeout: 5000 });
+  await expect(page.locator(".provenance")).toContainText("line 33 outage, shedding disabled");
 });
 
 test("D2: zeroing enough generation with 'Allow load shedding' off shows n/a (infeasible), never 0.00", async ({ page }) => {
@@ -94,6 +122,11 @@ test("D1: load applied while AlterCapacity's debounced capacity solve is genuine
   // surviving in production is AlterCapacity's 250ms DEBOUNCE window: a capacity change is confirmed
   // (not yet dispatched to the Worker) and a second control's Apply fires inside that window, so the
   // debounced setCapacity call ends up racing the load solve instead of being serialized behind it.
+  // A WASM load delay widens the window deterministically, rather than relying on exact keystroke
+  // timing landing the debounce after the load solve starts (confirmed by direct measurement without
+  // a delay that this ordering already happens 5/5 times at this test's keystroke count, but the delay
+  // removes any dependency on that being stable across machines/CI).
+  await withWasmDelay(page, 1500);
   await page.goto("/");
   await page.locator('section:has-text("Alter line capacity") select').selectOption({ index: 10 }); // line 9
   const capSlider = page.getByRole("slider");
@@ -186,33 +219,53 @@ test("keyboard-only parity (buttons/Escape): Line outage works end to end withou
   // Escape cancels the confirm without disabling the line
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("outage-list")).toHaveText("none");
-  await page.getByRole("button", { name: "Disable line" }).focus();
+  // focus must return to "Disable line" itself after Escape -- not re-focused by the test, which would
+  // hide the same focus-drops-to-body bug this fix addresses (confirmed before the fix: Escape here did
+  // nothing because the event never reached the section's onKeyDown from <body>)
+  await expect(page.getByRole("button", { name: "Disable line" })).toBeFocused();
   await page.keyboard.press("Enter");
-  await page.getByRole("button", { name: "Confirm outage" }).focus();
+  await expect(page.getByRole("button", { name: "Confirm outage" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("outage-list")).toHaveText("0", { timeout: 3000 });
 });
 
-test("reset during an active generator solve restores Pmax to rated and clears the outage list", async ({ page }) => {
+test("reset during an active generator solve restores Pmax to rated", async ({ page }) => {
+  // The gen solve must be the FIRST solve of the page load for the WASM delay to actually stall it --
+  // it only applies to the one-time WASM fetch, not to every subsequent solve. An earlier version of
+  // this test ran an outage first (and waited it out), so by the time the gen solve started the WASM
+  // module was already loaded and it resolved near-instantly, never actually racing the reset.
   await withWasmDelay(page, 1500);
   await page.goto("/");
-  await page.locator('section:has-text("Line outage") select').selectOption({ index: 1 });
-  await page.getByRole("button", { name: "Disable line" }).click();
-  await page.getByRole("button", { name: "Confirm outage" }).click();
-  await expect(page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]')).toBeVisible({ timeout: 3000 });
   await page.locator('section:has-text("Reduce generator") select').selectOption({ index: 1 });
   const slider = page.locator('section:has-text("Reduce generator") input[type=range]');
   await slider.fill("0");
-  await page.getByRole("button", { name: "Apply limit" }).click(); // solve in flight (~1.5s)
+  await page.getByRole("button", { name: "Apply limit" }).click(); // solve in flight (~1.5s, the page's first solve)
+  await expect(page.getByRole("button", { name: "Apply limit" })).toBeDisabled();
   await page.getByRole("button", { name: "Reset to baseline" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("gen-pmax")).toHaveText("80 MW"); // rated value for gen 0
-  await expect(page.getByTestId("outage-list")).toHaveText("none");
   await expect(page.getByTestId("gen-unserved")).toHaveText("0.00 MW");
   // the stale 1.5s generator solve must not silently override the reset once it resolves
   await page.waitForTimeout(2000);
   await expect(page.getByTestId("gen-pmax")).toHaveText("80 MW");
+  await expect(page.getByTestId("gen-unserved")).toHaveText("0.00 MW");
+});
+
+test("reset during an active line-outage solve clears the outage list", async ({ page }) => {
+  await withWasmDelay(page, 1500);
+  await page.goto("/");
+  await page.locator('section:has-text("Line outage") select').selectOption({ index: 1 });
+  await page.getByRole("button", { name: "Disable line" }).click();
+  await page.getByRole("button", { name: "Confirm outage" }).click(); // solve in flight (~1.5s, the page's first solve)
+  await expect(page.getByRole("button", { name: "Confirm outage" })).toHaveCount(0); // confirm UI already dismissed
+  await page.getByRole("button", { name: "Reset to baseline" }).focus();
+  await page.keyboard.press("Enter");
   await expect(page.getByTestId("outage-list")).toHaveText("none");
+  await expect(page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]')).toHaveCount(0);
+  // the stale 1.5s outage solve must not silently re-apply the outage once it resolves
+  await page.waitForTimeout(2000);
+  await expect(page.getByTestId("outage-list")).toHaveText("none");
+  await expect(page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]')).toHaveCount(0);
 });
 
 test("N2 regression: an unrelated control's solve does not wipe an uncommitted load-slider draft", async ({ page }) => {
@@ -235,4 +288,23 @@ test("N2 regression: an unrelated control's solve does not wipe an uncommitted l
   await expect(page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]')).toBeVisible({ timeout: 3000 });
   // the unrelated outage solve resolving must not resync this draft back to 1.00x
   await expect(page.getByTestId("load-factor")).toHaveText("2.00x");
+});
+
+test("N2 regression: an unrelated control's solve does not wipe an uncommitted generator-slider draft", async ({ page }) => {
+  // Same gap as above, for ReduceGenerator specifically -- the advisor review's own checklist flagged
+  // that INT-003's N2 claim had no dedicated test for ITS draft (IncreaseLoad shares the component
+  // pattern, but a shared pattern fixed in one file isn't proof the other file's copy is also correct).
+  await withWasmDelay(page, 800);
+  await page.goto("/");
+  await page.locator('section:has-text("Line outage") select').selectOption({ index: 1 });
+  await page.getByRole("button", { name: "Disable line" }).click();
+  await page.getByRole("button", { name: "Confirm outage" }).focus();
+  await page.keyboard.press("Enter");
+  await page.locator('section:has-text("Reduce generator") select').selectOption({ index: 1 });
+  const slider = page.locator('section:has-text("Reduce generator") input[type=range]');
+  await slider.fill("10"); // draft -> 10 MW, never applied
+  await expect(page.getByTestId("gen-pmax")).toHaveText("10 MW");
+  await expect(page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]')).toBeVisible({ timeout: 3000 });
+  // the unrelated outage solve resolving must not resync this draft back to 80 MW (rated)
+  await expect(page.getByTestId("gen-pmax")).toHaveText("10 MW");
 });

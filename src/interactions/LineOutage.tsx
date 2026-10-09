@@ -10,12 +10,15 @@ export function LineOutage() {
   const [line, setLine] = useState<number | null>(null)
   const [confirming, setConfirming] = useState(false)
   const confirmRef = useRef<HTMLButtonElement>(null)
-  // Without this, the "Disable line" button unmounts when confirming becomes true and the browser
-  // drops focus to <body> -- the section's own onKeyDown Escape handler only catches events bubbling
-  // from a DESCENDANT, so an event starting at <body> never reaches it, silently breaking the
-  // documented "Escape cancels" behavior for anyone who got here by keyboard (confirmed directly:
-  // document.activeElement read back as BODY after pressing Enter on "Disable line").
-  useEffect(() => { if (confirming) confirmRef.current?.focus() }, [confirming])
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  // Without this, whichever button triggered a `confirming` transition unmounts and the browser drops
+  // focus to <body> -- the section's own onKeyDown Escape handler only catches events bubbling from a
+  // DESCENDANT, so an event starting at <body> never reaches it, silently breaking the documented
+  // "Escape cancels" behavior for anyone who got here by keyboard (confirmed directly:
+  // document.activeElement read back as BODY after pressing Enter on "Disable line"). Covers both
+  // directions: entering confirm (focus "Confirm outage") and leaving it via Cancel/Escape (focus
+  // "Disable line"/"Restore line" again), not just the first one found.
+  useEffect(() => { (confirming ? confirmRef : triggerRef).current?.focus() }, [confirming])
   if (!network) return null
   const off = (pending?.disabledLines ?? disabledLines)
   const out = line !== null && off.includes(line)
@@ -29,7 +32,7 @@ export function LineOutage() {
           {network.lines.map(l => <option key={l.idx} value={l.idx}>Line {l.idx} ({network.buses[l.from_bus].name}-{network.buses[l.to_bus].name}){off.includes(l.idx) ? ' - OUT' : ''}</option>)}
         </select>
       </label>
-      {line !== null && !confirming && <button disabled={solve === 'solving'} onClick={() => out ? setLineOutage(line, false) : setConfirming(true)}>{out ? 'Restore line' : 'Disable line'}</button>}
+      {line !== null && !confirming && <button ref={triggerRef} disabled={solve === 'solving'} onClick={() => out ? setLineOutage(line, false) : setConfirming(true)}>{out ? 'Restore line' : 'Disable line'}</button>}
       {line !== null && confirming && (
         <div role="group" aria-label="Confirm outage">
           <p>Take line {line} out of service? It is removed from the topology.</p>
