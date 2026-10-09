@@ -43,8 +43,13 @@ export function CompareRestoration() {
   const [error, setError] = useState<string>()
   const [ranking, setRanking] = useState<RestoreSeq[]>()
   const [chosen, setChosen] = useState(0) // index into `ranking`
+  // StrictMode (main.tsx) double-invokes effects in dev: mount -> cleanup -> mount again. A plain
+  // `useRef(true)` initializer only runs once, so the FIRST mount's cleanup would permanently flip this
+  // to false and the second (real) mount would never set it back -- Compare then hangs on "Ranking..."
+  // forever under `npm run dev`, exactly where chapter/motion work happens. Setting it inside the effect
+  // body (not just the initializer) makes it correct across StrictMode's extra mount/unmount cycle.
   const mounted = useRef(true)
-  useEffect(() => () => { mounted.current = false }, [])
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false } }, [])
   if (!network) return null
   const preset = PRESETS.find((p) => p.id === presetId)!
 

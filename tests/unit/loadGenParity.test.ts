@@ -1,6 +1,6 @@
 // @vitest-environment node
 // TS-vs-Python parity for CAS-INT-002 (load_scale) / CAS-INT-003 (gen_pmax_mw), against
-// load_gen_sweep.json's 39 cases (7 of which force partial shed, not the all-or-nothing total-load
+// load_gen_sweep.json's 40 cases (8 of which force partial shed, not the all-or-nothing total-load
 // shed the manual M4 QA probe exercised). Mirrors tsPythonParity.test.ts's structure/tolerances.
 import { readFileSync, writeFileSync } from 'node:fs'
 import highsLoader from 'highs'

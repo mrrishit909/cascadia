@@ -28,6 +28,12 @@ verified user brief and approved reference images > approved project-specific co
 - Visualization: 2D SVG first; WebGL/R3F only if measurement proves 2D insufficient.
 - Chapter 4 ("outage cascades"): single-shot LP response, not a cascading-trip model.
 - CAS-INT-007 (line outage, P1): approved and in `specifications/REQUIREMENTS.yaml`.
+- Motion library: GSAP + ScrollTrigger. License checked directly (web search, 2026): free for commercial
+  use since v3.14 (Webflow acquired GSAP, made it free Labor Day 2025), but under Webflow's own
+  "Standard No-Charge" license, NOT OSI-approved/MIT -- its one substantive restriction (building a
+  visual no-code animation tool that competes with Webflow) does not apply to this project's use
+  (animating a data visualization, not building an animation authoring tool), so it's fine here, but
+  don't describe it as "MIT" or "open source" in any doc.
 - This project is held to BOTH the Atlas's 5-gate system AND the parent 10-site portfolio
   directive's doc-file list and 11-category release gate (user-confirmed).
 
