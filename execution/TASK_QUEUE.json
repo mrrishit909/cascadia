@@ -80,7 +80,7 @@
         "cas_int_001_control",
         "cas_int_005_control"
       ],
-      "status": "pending",
+      "status": "done",
       "prompt_file": "no_fake_numbers_audit.txt",
       "test_cmd": ""
     },
