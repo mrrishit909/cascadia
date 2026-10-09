@@ -58,3 +58,35 @@ it('removing bus 26 shows oracle unserved MW, no-generation shed, and reset rest
   expect(snap.removedBus).toBeNull()
   expect(screen.getByTestId('unserved-mw')).toHaveTextContent('0.00 MW')
 })
+
+// CAS-INT-005: oracle case line_cap_9_x0.5 (binding [9,28,29], shed 5.2996 MW).
+it('line 9 at 0.5x shows oracle binding lines and shed, and reset restores baseline exactly', async () => {
+  vi.stubGlobal('fetch', async (url: string) => {
+    const mod = await files[`/public${url.slice(url.indexOf('/data/'))}`]()
+    return { ok: true, json: async () => mod }
+  })
+  const ref = JSON.parse(readFileSync('verification/REFERENCE_RESULTS/n1_sweep.json', 'utf8')).cases
+    .find((c: { case_id: string }) => c.case_id === 'line_cap_9_x0.5')
+  const highs = await highsLoader()
+  let snap!: AppState
+  const Probe = () => { snap = useApp().state; return null }
+  render(<AppProvider solver={async (c, sc) => solveDcopf(c, highs, sc)}><Probe /><Scene /></AppProvider>)
+  await screen.findAllByTestId('bus')
+  const baseline = snap.result, baselineCopy = structuredClone(snap.result)
+  expect(screen.getByTestId('binding-lines')).toHaveTextContent('none')
+
+  const line = screen.getAllByTestId('line')[9]
+  line.focus(); fireEvent.keyDown(line, { key: 'Enter' }) // keyboard select
+  fireEvent.change(screen.getByRole('slider'), { target: { value: '0.5' } })
+  await waitFor(() => expect(screen.getByTestId('binding-lines')).toHaveTextContent(ref.binding_lines.join(', ')), { timeout: 3000 })
+  expect(screen.getByTestId('cap-unserved')).toHaveTextContent(`${ref.total_shed.toFixed(2)} MW`)
+  for (const i of ref.binding_lines) expect(screen.getAllByTestId('line')[i]).toHaveAttribute('data-binding', 'binding')
+  expect(screen.getAllByTestId('line')[0]).toHaveAttribute('data-binding', 'slack')
+
+  fireEvent.click(screen.getByText('Reset to baseline'))
+  expect(snap.result).toBe(baseline)
+  expect(snap.result).toEqual(baselineCopy)
+  expect(snap.lineCapacity).toEqual({})
+  expect(screen.getByTestId('binding-lines')).toHaveTextContent('none')
+  expect(screen.getAllByTestId('line')[9]).toHaveAttribute('data-binding', 'slack')
+})

@@ -11,8 +11,8 @@ function project(network: Case30) {
   return network.buses.map(b => ({ x: PAD + (b.x - x0) * k, y: H - PAD - (b.y - y0) * k }))
 }
 
-interface Props { network: Case30; result: SolveResult; removedBus?: number | null; selectedBus?: number | null; onSelect?: (bus: number) => void }
-export function NetworkView({ network, result, removedBus = null, selectedBus = null, onSelect }: Props) {
+interface Props { network: Case30; result: SolveResult; removedBus?: number | null; selectedBus?: number | null; onSelect?: (bus: number) => void; selectedLine?: number | null; onSelectLine?: (line: number) => void; alteredLines?: number[] }
+export function NetworkView({ network, result, removedBus = null, selectedBus = null, onSelect, selectedLine = null, onSelectLine, alteredLines = [] }: Props) {
   const noGen = new Set(result.islands.filter(i => i.kind === 'shed_no_generation').flatMap(i => i.buses))
   const pos = project(network)
   const maxFlow = Math.max(...Object.values(result.flows).map(Math.abs), 1)
@@ -25,8 +25,20 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           const a = pos[l.from_bus], b = pos[l.to_bus]
           const dead = l.from_bus === removedBus || l.to_bus === removedBus
           if (dead) return <line key={l.idx} data-testid="line" data-line={l.idx} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#E0645A" strokeWidth={1} strokeDasharray="1 5" opacity={0.6} />
-          return <line key={l.idx} data-testid="line" data-line={l.idx} x1={a.x} y1={a.y} x2={b.x} y2={b.y}
-            stroke={f > 0.01 ? '#EF9C54' : '#5E6B78'} strokeWidth={1 + 4 * f / maxFlow} strokeLinecap="round" />
+          // binding comes from the Worker's binding_lines, never computed here.
+          const binding = result.binding_lines.includes(l.idx)
+          const sel = selectedLine === l.idx
+          return <g key={l.idx} data-testid="line" data-line={l.idx} data-binding={binding ? 'binding' : 'slack'}
+            data-altered={alteredLines.includes(l.idx)} role="button" tabIndex={0} aria-pressed={sel} style={{ cursor: 'pointer' }}
+            aria-label={`Line ${l.idx}, ${binding ? 'binding' : 'slack'}, ${f.toFixed(2)} of ${(result.line_rating_mw[l.idx] ?? l.rating_mw).toFixed(2)} MW. Press Enter to select for capacity.`}
+            onClick={() => onSelectLine?.(l.idx)}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectLine?.(l.idx) } }}>
+            <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
+            {sel && <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="#6FA9BE" strokeWidth={9} opacity={0.35} />}
+            <line x1={a.x} y1={a.y} x2={b.x} y2={b.y}
+              stroke={binding ? '#E0645A' : f > 0.01 ? '#EF9C54' : '#5E6B78'} strokeWidth={1 + 4 * f / maxFlow} strokeLinecap="round"
+              strokeDasharray={binding ? '6 3' : undefined} />
+          </g>
         })}
       </g>
       <g>

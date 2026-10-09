@@ -64,7 +64,7 @@ requirements:
     behavior: "alter line capacity"
     owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
     verification: ["unit:n1_parity_sweep", "e2e:cas_capacity_change"]
-    status: unstarted
+    status: implemented
     evidence_paths: []
   - id: CAS-INT-006
     project: "CASCADIA"

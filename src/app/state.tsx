@@ -17,32 +17,35 @@ export interface AppState {
   solveError?: string
   removedBus: number | null
   lineCapacity: Record<number, number> // line idx -> capacity factor
+  selectedLine: number | null
 }
 export type Action =
   | { type: 'loaded'; scenario: Scenario; network: Case30; result: Precomputed }
   | { type: 'failed'; error: string }
-  | { type: 'solved'; result: Precomputed; removedBus: number | null }
+  | { type: 'solved'; result: Precomputed; removedBus: number | null; lineCapacity?: Record<number, number> }
+  | { type: 'selectLine'; line: number | null }
   | { type: 'select'; bus: number | null }
   | { type: 'solving' }
   | { type: 'solveFailed'; error: string }
   | { type: 'reset' }
 
-const initial: AppState = { load: 'loading', removedBus: null, selectedBus: null, solve: 'idle', lineCapacity: {} }
+const initial: AppState = { load: 'loading', removedBus: null, selectedBus: null, solve: 'idle', lineCapacity: {}, selectedLine: null }
 
 function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
     case 'loaded': return { ...s, load: 'ready', scenario: a.scenario, network: a.network, result: a.result, baseline: a.result }
     case 'failed': return { ...s, load: 'error', error: a.error }
-    case 'solved': return { ...s, result: a.result, removedBus: a.removedBus, selectedBus: null, solve: 'idle', solveError: undefined }
+    case 'solved': return { ...s, result: a.result, removedBus: a.removedBus, lineCapacity: a.lineCapacity ?? {}, selectedBus: null, solve: 'idle', solveError: undefined }
+    case 'selectLine': return { ...s, selectedLine: a.line }
     case 'select': return { ...s, selectedBus: a.bus }
     case 'solving': return { ...s, solve: 'solving', solveError: undefined }
     case 'solveFailed': return { ...s, solve: 'error', solveError: a.error }
-    case 'reset': return { ...s, result: s.baseline, removedBus: null, selectedBus: null, solve: 'idle', solveError: undefined }
+    case 'reset': return { ...s, result: s.baseline, removedBus: null, lineCapacity: {}, selectedLine: null, selectedBus: null, solve: 'idle', solveError: undefined }
   }
 }
 
 export type Solver = (c: Case30, sc: ScenarioParams) => Promise<DcopfResult>
-const Ctx = createContext<{ state: AppState; dispatch: Dispatch<Action>; removeBus: (bus: number) => Promise<void> } | null>(null)
+const Ctx = createContext<{ state: AppState; dispatch: Dispatch<Action>; removeBus: (bus: number) => Promise<void>; setCapacity: (line: number, factor: number, allowShed: boolean) => Promise<void> } | null>(null)
 
 // Real Worker, created lazily on first solve.
 function workerSolver(): Solver {
@@ -85,13 +88,30 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
     if (!state.network) return
     dispatch({ type: 'solving' })
     try {
-      const r = await solve(state.network, { removed_buses: [bus] })
-      dispatch({ type: 'solved', removedBus: bus, result: {
+      const r = await solve(state.network, { removed_buses: [bus], line_capacity_factor: state.lineCapacity })
+      dispatch({ type: 'solved', removedBus: bus, lineCapacity: state.lineCapacity, result: {
         id: `bus_removal_${bus}`, label: `Live HiGHS Worker solve: bus ${bus} removed (island-aware DC-OPF)`,
         limitations: state.baseline?.limitations ?? [], result: r } })
     } catch (e) {
       if (!(e instanceof SupersededError)) dispatch({ type: 'solveFailed', error: e instanceof Error ? e.message : String(e) })
     }
-  }, [solve, state.network, state.baseline])
-  return <Ctx.Provider value={{ state, dispatch, removeBus }}>{children}</Ctx.Provider>
+  }, [solve, state.network, state.baseline, state.lineCapacity])
+  // CAS-INT-005: real Worker solve with one line's capacity factor changed (factor 1 = baseline rating).
+  // Other lines' factors and any removed bus stay applied. Latest-wins via lpClient (SupersededError ignored).
+  const setCapacity = useCallback(async (line: number, factor: number, allowShed: boolean) => {
+    if (!state.network) return
+    const cap = { ...state.lineCapacity }
+    if (factor === 1) delete cap[line]; else cap[line] = factor
+    dispatch({ type: 'solving' })
+    try {
+      const r = await solve(state.network, { line_capacity_factor: cap, allow_shed: allowShed,
+        ...(state.removedBus !== null && { removed_buses: [state.removedBus] }) })
+      dispatch({ type: 'solved', removedBus: state.removedBus, lineCapacity: cap, result: {
+        id: `line_capacity_${line}_x${factor}`, label: `Live HiGHS Worker solve: line ${line} capacity x${factor}${allowShed ? '' : ', shedding disabled'}`,
+        limitations: state.baseline?.limitations ?? [], result: r } })
+    } catch (e) {
+      if (!(e instanceof SupersededError)) dispatch({ type: 'solveFailed', error: e instanceof Error ? e.message : String(e) })
+    }
+  }, [solve, state.network, state.baseline, state.lineCapacity, state.removedBus])
+  return <Ctx.Provider value={{ state, dispatch, removeBus, setCapacity }}>{children}</Ctx.Provider>
 }

@@ -1,5 +1,6 @@
 import { AppProvider, useApp } from './state'
 import { RemoveNode } from '../interactions/RemoveNode'
+import { AlterCapacity } from '../interactions/AlterCapacity'
 import { NetworkView } from '../visualization/NetworkView'
 
 export function Scene() {
@@ -10,8 +11,11 @@ export function Scene() {
     <main>
       <h1>CASCADIA</h1>
       <NetworkView network={state.network} result={state.result.result} removedBus={state.removedBus}
-        selectedBus={state.selectedBus} onSelect={bus => dispatch({ type: 'select', bus })} />
+        selectedBus={state.selectedBus} onSelect={bus => dispatch({ type: 'select', bus })}
+        selectedLine={state.selectedLine} onSelectLine={line => dispatch({ type: 'selectLine', line })}
+        alteredLines={Object.keys(state.lineCapacity).map(Number)} />
       <RemoveNode />
+      <AlterCapacity />
       <p className="provenance">{state.result.label}</p>
     </main>
   )
