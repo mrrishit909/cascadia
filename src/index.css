@@ -221,3 +221,20 @@ strong { color: var(--text); font-variation-settings: 'wdth' 75, 'wght' 560; }
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* Standard visually-hidden-but-announced pattern: present to screen readers, invisible on screen.
+   Used by StatusRegion/RestorationStatusRegion -- every control already shows its own numbers visibly,
+   so a second visible copy at the top of the page would duplicate content and (worse) shift layout
+   every time its text changes (a CLS risk). Clip, not display:none/visibility:hidden, which assistive
+   tech treats as removed from the accessibility tree. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

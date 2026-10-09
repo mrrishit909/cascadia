@@ -18,12 +18,18 @@ test("axe-core: baseline page has zero violations", async ({ page }) => {
 // Architecture-stabilization regression: RemoveNode/AlterCapacity/ScenarioReadout used to each carry
 // their own role="status"/role="alert" element, so a single solve fired up to 6 duplicate screen-reader
 // announcements. StatusRegion/RestorationStatusRegion (App.tsx) are now the ONLY live-announcing
-// elements: exactly one for the main scenario subsystem, plus a second once restoration has run.
-test("exactly one live region announces the main scenario; a second appears only once restoration runs", async ({ page }) => {
+// elements: two permanently-mounted nodes per subsystem (one role="status", one role="alert"), always
+// present so a screen reader can detect the text MUTATION rather than missing a freshly-inserted node
+// (a real defect found and fixed in a second advisor-review pass: the first version of this fix
+// conditionally mounted/unmounted the live region, which screen readers frequently never announce).
+test("exactly 4 live regions are always mounted; restoration's status text updates once Compare runs", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".provenance");
-  const liveRegions = () => page.locator('[role="status"], [role="alert"]');
-  await expect(liveRegions()).toHaveCount(1);
+  const liveRegions = page.locator('[role="status"], [role="alert"]');
+  await expect(liveRegions).toHaveCount(4);
+  const restorationStatus = page.getByTestId("restoration-status-region-status");
+  await expect(restorationStatus).toHaveText("");
   await page.getByRole("button", { name: "Compare" }).click();
-  await expect(liveRegions()).toHaveCount(2, { timeout: 5000 });
+  await expect(restorationStatus).toHaveText(/restoration orders ranked\./, { timeout: 5000 });
+  await expect(liveRegions).toHaveCount(4);
 });

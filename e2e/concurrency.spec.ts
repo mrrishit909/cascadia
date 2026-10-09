@@ -110,7 +110,10 @@ test("multiple rapid capacity changes: the solver-applied rating matches the fin
   // solver-derived: 0.75 x 32 MW = 24.00 MW -- confirms the Worker actually applied the LAST input, not
   // a lost/intermediate one (the original version of this test never checked the applied value at all).
   await expect.poll(() => line9AriaLabel(page), { timeout: 2000 }).toContain("24.00 MW");
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  // StatusRegion/RestorationStatusRegion's role="alert" nodes are now always mounted (empty text when
+  // idle, see e2e/a11y.spec.ts) rather than appearing only on error, so "no error" is "empty text", not
+  // "zero alert nodes".
+  for (const alert of await page.getByRole("alert").all()) await expect(alert).toHaveText("");
 });
 
 test("N1: removing a bus respects the current 'Allow load shedding' setting, not the engine default", async ({ page }) => {
@@ -149,5 +152,5 @@ test("solve failure (blocked WASM) shows a real error, stays interactive, and re
   await removeBusKeyboard(page, 26);
   await expect(page.locator('[data-testid="bus"][data-bus="26"]')).toHaveAttribute("data-state", "removed", { timeout: 5000 });
   await expect(page.getByTestId("unserved-mw")).toHaveText("13.00 MW");
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  for (const alert of await page.getByRole("alert").all()) await expect(alert).toHaveText("");
 });
