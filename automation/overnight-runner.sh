@@ -12,6 +12,30 @@ set -uo pipefail
 # run (Phase 13) caught: claude -p exited 127 (command not found) without it.
 export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.nvm/versions/node/v24.21.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
 
+# This Mac has no GNU `timeout`/`gtimeout` (confirmed: `which timeout` fails;
+# macOS doesn't ship coreutils by default, and installing coreutils just to
+# get `timeout` would be a new dependency for one feature bash can do itself).
+# Portable replacement: background the command, poll for exit, kill on
+# deadline. Usage: run_with_timeout SECONDS cmd arg1 arg2 ...
+run_with_timeout() {
+  local secs="$1"; shift
+  "$@" &
+  local cmd_pid=$!
+  local waited=0
+  while kill -0 "$cmd_pid" 2>/dev/null; do
+    if [ "$waited" -ge "$secs" ]; then
+      kill -TERM "$cmd_pid" 2>/dev/null
+      sleep 2
+      kill -KILL "$cmd_pid" 2>/dev/null
+      wait "$cmd_pid" 2>/dev/null
+      return 124  # same convention GNU timeout uses for "killed on deadline"
+    fi
+    sleep 1
+    waited=$((waited + 1))
+  done
+  wait "$cmd_pid"
+}
+
 REPO="$HOME/cascadia"
 cd "$REPO" || { echo "FATAL: cannot cd to $REPO" >&2; exit 1; }
 
@@ -87,7 +111,7 @@ fi
 
 RESULT_FILE="$LOG_DIR/${TASK_ID}-${TS}.json"
 log "Running claude -p for task $TASK_ID (timeout ${MAX_TASK_SECONDS}s)"
-timeout "$MAX_TASK_SECONDS" env -u ANTHROPIC_MODEL claude -p --model sonnet --output-format json "$(cat "$PROMPT_PATH")" > "$RESULT_FILE" 2>>"$LOG_FILE"
+run_with_timeout "$MAX_TASK_SECONDS" env -u ANTHROPIC_MODEL claude -p --model sonnet --output-format json "$(cat "$PROMPT_PATH")" > "$RESULT_FILE" 2>>"$LOG_FILE"
 CLAUDE_EXIT=$?
 log "claude -p exit code: $CLAUDE_EXIT"
 

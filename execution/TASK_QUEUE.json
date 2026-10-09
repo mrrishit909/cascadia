@@ -6,7 +6,10 @@
       "depends_on": [],
       "status": "pending",
       "prompt_file": "frontend_scene_skeleton.txt",
-      "test_cmd": "npm run build && npm run test"
+      "test_cmd": "npm run build && npm run test",
+      "failures": [
+        "claude_exit_127"
+      ]
     },
     {
       "id": "highs_worker_setup",
