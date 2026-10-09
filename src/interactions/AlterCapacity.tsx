@@ -99,13 +99,17 @@ export function AlterCapacity() {
           <label><input type="checkbox" checked={allowShed} onChange={e => { dispatch({ type: 'setCapDraft', factor, allowShed: e.target.checked }); fire(factor, e.target.checked) }} /> Allow load shedding</label>
         </div>
       )}
-      {solving && <p role="status">Solving DC-OPF in Worker...</p>}
-      {solve === 'error' && <p role="alert">Solve failed: {solveError}</p>}
-      {r.status === 'infeasible' && <p role="alert">Infeasible: {r.diagnostics.join('; ') || 'no feasible dispatch'}</p>}
+      {/* Architecture-stabilization fix: these were role="status"/role="alert" (each an independent
+          live region) -- a single solve triggered duplicate screen-reader announcements across every
+          mounted control. The shared <StatusRegion/> (App.tsx) is now the only live-announcing
+          element; these stay plain text, visually identical, silent to AT. */}
+      {solving && <p>Solving DC-OPF in Worker...</p>}
+      {solve === 'error' && <p>Solve failed: {solveError}</p>}
+      {r.status === 'infeasible' && <p>Infeasible: {r.diagnostics.join('; ') || 'no feasible dispatch'}</p>}
       {/* Infeasible means no valid dispatch exists; "0.00 MW" would read as "fully served". n/a is
           deliberately not a number. Found by no_fake_numbers_audit's adversarial review
           (verification/NO_FAKE_NUMBERS_AUDIT.md #6). */}
-      <p role="status" aria-live="polite">
+      <p>
         {r.status === 'infeasible' ? (
           <>Binding lines: <strong data-testid="binding-lines">n/a (infeasible)</strong>
           {' '}| Unserved: <strong data-testid="cap-unserved">n/a (infeasible)</strong></>

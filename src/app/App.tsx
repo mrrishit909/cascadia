@@ -6,6 +6,8 @@ import { ReduceGenerator } from '../interactions/ReduceGenerator'
 import { LineOutage } from '../interactions/LineOutage'
 import { AddLine } from '../interactions/AddLine'
 import { CompareRestoration } from '../interactions/CompareRestoration'
+import { StatusRegion } from '../interactions/StatusRegion'
+import { RestorationStatusRegion } from '../interactions/RestorationStatusRegion'
 import { NetworkView } from '../visualization/NetworkView'
 
 export function Scene() {
@@ -15,6 +17,8 @@ export function Scene() {
   return (
     <main>
       <h1>CASCADIA</h1>
+      <StatusRegion />
+      <RestorationStatusRegion />
       <NetworkView network={state.network} result={state.result.result} removedBus={state.removedBus}
         selectedBus={state.selectedBus} onSelect={bus => dispatch({ type: 'select', bus })}
         selectedLine={state.selectedLine} onSelectLine={line => dispatch({ type: 'selectLine', line })}

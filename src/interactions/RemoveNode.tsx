@@ -39,13 +39,17 @@ export function RemoveNode() {
           that solve's eventual resolution is discarded rather than overwriting the just-reset state when
           it lands. Disabled only when there's genuinely nothing to reset (no confirmed or pending change). */}
       <button disabled={removedBus === null && pending === null && result === state.baseline} onClick={() => dispatch({ type: 'reset' })}>Reset to baseline</button>
-      {solving && <p role="status">Solving island-aware DC-OPF in Worker...</p>}
-      {solve === 'error' && <p role="alert">Solve failed: {solveError}</p>}
-      {r.status === 'infeasible' && <p role="alert">Infeasible: {r.diagnostics.join('; ') || 'no feasible dispatch'}</p>}
+      {/* Architecture-stabilization fix: these were role="status"/role="alert" (each an independent
+          live region) -- a single solve triggered duplicate screen-reader announcements across every
+          mounted control. The shared <StatusRegion/> (App.tsx) is now the only live-announcing
+          element; these stay plain text, visually identical, silent to AT. */}
+      {solving && <p>Solving island-aware DC-OPF in Worker...</p>}
+      {solve === 'error' && <p>Solve failed: {solveError}</p>}
+      {r.status === 'infeasible' && <p>Infeasible: {r.diagnostics.join('; ') || 'no feasible dispatch'}</p>}
       {/* Infeasible means no valid dispatch exists at all -- showing "0.00 MW" here would read as
           "fully served", not "undefined". n/a is deliberately not a number. Found by the
           no_fake_numbers_audit task's adversarial review (verification/NO_FAKE_NUMBERS_AUDIT.md #6). */}
-      <p role="status" aria-live="polite">
+      <p>
         {removedBus !== null && <>Bus {network.buses[removedBus].name} unavailable. </>}
         Unserved: <strong data-testid="unserved-mw">{r.status === 'infeasible' ? 'n/a (infeasible)' : mw(r.total_unserved_mw)}</strong>
       </p>

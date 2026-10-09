@@ -42,11 +42,16 @@ export function CompareRestoration() {
         </select>
       </label>{' '}
       <button disabled={status === 'loading'} onClick={() => void compareRestoration(preset.down)}>Compare</button>
-      {status === 'loading' && <p role="status">Ranking {factorial(preset.down.length)} orders in Worker...</p>}
-      {status === 'error' && <p role="alert">Rank failed: {error}</p>}
+      {/* Architecture-stabilization fix: these were role="status"/role="alert" (each an independent
+          live region). A single mounted instance was already fine; dual-mounting (chapter 5 + lab,
+          per docs/ART_DIRECTION.md) would have doubled the announcement. The shared
+          <RestorationStatusRegion/> (App.tsx) is now the only live-announcing element for this
+          subsystem; these stay plain text, visually identical, silent to AT. */}
+      {status === 'loading' && <p>Ranking {factorial(preset.down.length)} orders in Worker...</p>}
+      {status === 'error' && <p>Rank failed: {error}</p>}
       {ranking && best && sel && (
         <>
-          <p role="status" aria-live="polite">
+          <p>
             <span data-testid="cr-n-orders">{ranking.length}</span> orders ranked. Best: rank {best.rank}, order [{best.order.join(', ')}], <span data-testid="cr-best-served">{best.served_mw_steps.toFixed(2)}</span> MW&middot;steps.
           </p>
           <ul>

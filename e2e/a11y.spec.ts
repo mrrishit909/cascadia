@@ -14,3 +14,16 @@ test("axe-core: baseline page has zero violations", async ({ page }) => {
   }
   expect(results.violations).toEqual([]);
 });
+
+// Architecture-stabilization regression: RemoveNode/AlterCapacity/ScenarioReadout used to each carry
+// their own role="status"/role="alert" element, so a single solve fired up to 6 duplicate screen-reader
+// announcements. StatusRegion/RestorationStatusRegion (App.tsx) are now the ONLY live-announcing
+// elements: exactly one for the main scenario subsystem, plus a second once restoration has run.
+test("exactly one live region announces the main scenario; a second appears only once restoration runs", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".provenance");
+  const liveRegions = () => page.locator('[role="status"], [role="alert"]');
+  await expect(liveRegions()).toHaveCount(1);
+  await page.getByRole("button", { name: "Compare" }).click();
+  await expect(liveRegions()).toHaveCount(2, { timeout: 5000 });
+});
