@@ -33,11 +33,12 @@ test("D2: zeroing enough generation with 'Allow load shedding' off shows n/a (in
   // with shedding disallowed the LP has no feasible dispatch at all.
   for (let idx = 1; idx <= 4; idx++) {
     await genSelect.selectOption({ index: idx });
-    await slider.focus();
-    for (let i = 0; i < 90; i++) await page.keyboard.press("ArrowDown"); // drive Pmax to 0
+    await slider.fill("0"); // deterministic vs. counting ArrowDown presses against a per-generator rated max
     await expect(page.getByTestId("gen-pmax")).toHaveText("0 MW");
     await page.getByRole("button", { name: "Apply limit" }).click();
-    await expect(page.getByTestId("gen-unserved")).not.toHaveText("", { timeout: 5000 }); // wait for this solve to land
+    // each iteration's solve must fully resolve before the next is fired, or the next selectOption's
+    // own resync effect can read a not-yet-landed `eff` and build on a stale base
+    await expect(page.getByRole("button", { name: "Apply limit" })).toBeEnabled({ timeout: 5000 });
   }
   await expect(page.getByTestId("gen-unserved")).toHaveText("n/a (infeasible)", { timeout: 5000 });
 });
@@ -86,6 +87,21 @@ test("Reset restores load/generator/outage controls to baseline and clears their
   // the resynced draft (N2 class) must show baseline (1.00x), not the pre-reset value
   await expect(page.getByTestId("load-factor")).toHaveText("1.00x");
   await expect(page.getByTestId("load-unserved")).toHaveText("0.00 MW");
+});
+
+test("a disabled line can be restored via keyboard directly on the SVG, not only the LineOutage select", async ({ page }) => {
+  await page.goto("/");
+  await page.locator('section:has-text("Line outage") select').selectOption({ index: 1 }); // line 0
+  await page.getByRole("button", { name: "Disable line" }).click();
+  await page.getByRole("button", { name: "Confirm outage" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("outage-list")).toHaveText("0", { timeout: 5000 });
+  const svgLine = page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]');
+  await expect(svgLine).toBeVisible();
+  await svgLine.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("outage-list")).toHaveText("none", { timeout: 5000 });
+  await expect(page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]')).toHaveCount(0);
 });
 
 test("N2 regression: an unrelated control's solve does not wipe an uncommitted load-slider draft", async ({ page }) => {
