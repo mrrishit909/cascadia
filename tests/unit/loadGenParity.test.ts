@@ -15,7 +15,7 @@ const highs = await highsLoader()
 const rel = (a: number, b: number) => Math.abs(a - b) / (Math.abs(a) > 1e-9 ? Math.abs(a) : 1)
 const maxAbs = (a: (number | null)[]) => Math.max(0, ...a.filter((v): v is number => v != null).map(Math.abs))
 
-it('39-case load_scale/gen_pmax_mw TS/Python parity, including 7 partial-shed cases', () => {
+it('40-case load_scale/gen_pmax_mw TS/Python parity, including 8 partial-shed cases', () => {
   const rows = sweep.cases.map((k: any) => {
     const r = solveDcopf(c30, highs, k.scenario as ScenarioParams)
     const pb = maxAbs(k.per_island_balance), tb = maxAbs(r.islands.map((i) => i.balance_mw ?? null))
@@ -28,7 +28,7 @@ it('39-case load_scale/gen_pmax_mw TS/Python parity, including 7 partial-shed ca
   writeFileSync(new URL('verification/REFERENCE_RESULTS/load_gen_parity.json', root), JSON.stringify({
     meta: { n: rows.length, passed: rows.length - fails.length, tol_rel: 1e-3, tol_balance_mw: 1e-6 }, rows }, null, 1))
   console.log(`LOAD_GEN_PARITY ${rows.length - fails.length}/${rows.length}`, JSON.stringify(fails))
-  expect(rows.length).toBe(39)
+  expect(rows.length).toBe(40)
   expect(fails).toEqual([])
   const partial = rows.filter((r: any) => r.ts_shed > 1e-6 && r.ts_shed < 189.2 - 1e-6)
   expect(partial.length).toBeGreaterThan(0) // proves this sweep exercises real dispatch, not just all-or-nothing

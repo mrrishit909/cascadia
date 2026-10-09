@@ -814,6 +814,32 @@
    "binding_lines": [],
    "pass_invariants": true,
    "violations": []
+  },
+  {
+   "case_id": "combo_line9_cap_x0.95_load_bus7_x4",
+   "scenario": {
+    "line_capacity_factor": {
+     "9": 0.95
+    },
+    "load_scale": {
+     "7": 4.0
+    }
+   },
+   "status": "optimal",
+   "objective": 79301.9480423927,
+   "total_shed": 78.62888900923677,
+   "shed_economic": 78.62888900923677,
+   "n_islands": 1,
+   "per_island_balance": [
+    0.0
+   ],
+   "binding_lines": [
+    9,
+    28,
+    29
+   ],
+   "pass_invariants": true,
+   "violations": []
   }
  ]
 }

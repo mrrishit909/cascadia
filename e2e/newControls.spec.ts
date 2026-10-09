@@ -14,13 +14,19 @@ async function withWasmDelay(page: Page, ms: number) {
 
 // "Allow load shedding" is scoped to AlterCapacity.tsx's own rendered block (it only exists once a
 // line is selected there), but the field it controls (allowShed) is shared scenario-wide -- so any
-// control can observe it once set. Select a line, then flip the checkbox, via keyboard only.
+// control can observe it once set. Select a line, then flip the checkbox, via keyboard only. Waits
+// for AlterCapacity's own debounced solve to actually COMMIT allowShed=false (read from `.provenance`,
+// which runScen/setCapacity only write from the confirmed scenario), not just for the checkbox's own
+// local draft state -- a reviewer-flagged gap: without this wait, a later control's Apply can fire
+// before this solve lands, so its result would come from THAT control's own re-solve (which also
+// threads allowShed through base()), not actually proving this checkbox's intent reached the Worker.
 async function disallowSheddingGlobally(page: Page) {
   await page.locator('section:has-text("Alter line capacity") select').selectOption({ index: 1 });
   const cb = page.getByRole("checkbox", { name: "Allow load shedding" });
   await cb.focus();
   await page.keyboard.press("Space");
   await expect(cb).not.toBeChecked();
+  await expect(page.locator(".provenance")).toContainText("shedding disabled", { timeout: 2000 });
 }
 
 test("D2: zeroing enough generation with 'Allow load shedding' off shows n/a (infeasible), never 0.00", async ({ page }) => {
@@ -54,24 +60,33 @@ test("N1: increasing load respects 'Allow load shedding' off, not the engine def
   await page.getByRole("button", { name: "Apply load" }).click();
   // 10x a real load bus with shedding disallowed must be infeasible, not silently clamped/shed
   await expect(page.getByTestId("load-unserved")).toHaveText("n/a (infeasible)", { timeout: 5000 });
+  // direct proof setLoadScale's own runScen carried allowShed through base(), not a side effect of
+  // some other control's re-solve: the label is built from scenario.allowShed at the call site itself.
+  await expect(page.locator(".provenance")).toContainText("load x10, shedding disabled");
 });
 
-test("D1: applying load while a line-outage solve is genuinely in flight: both land, solver-confirmed", async ({ page }) => {
-  await withWasmDelay(page, 1500);
+test("D1: load applied while AlterCapacity's debounced capacity solve is genuinely in flight: both land, solver-confirmed", async ({ page }) => {
+  // Every Apply/Confirm button in this app disables itself during solve, so a race can't be driven
+  // through a second button click (Playwright's .click() waits for enabled) -- the real D1-class race
+  // surviving in production is AlterCapacity's 250ms DEBOUNCE window: a capacity change is confirmed
+  // (not yet dispatched to the Worker) and a second control's Apply fires inside that window, so the
+  // debounced setCapacity call ends up racing the load solve instead of being serialized behind it.
   await page.goto("/");
-  await page.locator('section:has-text("Line outage") select').selectOption({ index: 1 }); // line 0
-  await page.getByRole("button", { name: "Disable line" }).click();
-  await page.getByRole("button", { name: "Confirm outage" }).focus();
-  await page.keyboard.press("Enter"); // outage solve now in flight (~1.5s)
-  await page.locator('section:has-text("Increase load") select').selectOption({ index: 1 });
-  const slider = page.locator('section:has-text("Increase load") input[type=range]');
-  await slider.focus();
-  for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight"); // 1x -> 2x
-  await page.getByRole("button", { name: "Apply load" }).click(); // fires before the outage solve necessarily resolved
-  await expect(page.getByTestId("outage-list")).toHaveText("0", { timeout: 5000 });
-  await expect(page.getByTestId("load-factor")).toHaveText("2.00x");
-  // both changes must be reflected in the FINAL solver result, not just local draft state
-  await expect(page.getByTestId("load-unserved")).not.toHaveText("n/a (infeasible)");
+  await page.locator('section:has-text("Alter line capacity") select').selectOption({ index: 10 }); // line 9
+  const capSlider = page.getByRole("slider");
+  await capSlider.focus();
+  await page.keyboard.press("ArrowLeft"); // 1.00x -> 0.95x, debounce timer armed, NOT yet sent to the Worker
+  await page.locator('section:has-text("Increase load") select').selectOption({ index: 5 }); // bus 7
+  const loadSlider = page.locator('section:has-text("Increase load") input[type=range]');
+  await loadSlider.focus();
+  for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowRight"); // 1x -> 4x
+  await expect(page.getByTestId("load-factor")).toHaveText("4.00x");
+  await page.getByRole("button", { name: "Apply load" }).click(); // fires well inside the 250ms debounce window
+  // solver-derived: both the capacity change (read from the engine's own line_rating_mw via the line's
+  // aria-label) and the load change must land in the SAME final combined result, matching the oracle's
+  // combo_line9_cap_x0.95_load_bus7_x4 case (verification/REFERENCE_RESULTS/load_gen_sweep.json)
+  await expect.poll(() => page.locator('[data-testid="line"][data-line="9"]').getAttribute("aria-label"), { timeout: 3000 }).toContain("30.40 MW");
+  await expect(page.getByTestId("load-unserved")).toHaveText("78.63 MW", { timeout: 3000 });
 });
 
 test("Reset restores load/generator/outage controls to baseline and clears their drafts", async ({ page }) => {
@@ -117,7 +132,11 @@ test("N2 regression: an unrelated control's solve does not wipe an uncommitted l
   await slider.focus();
   for (let i = 0; i < 4; i++) await page.keyboard.press("ArrowRight"); // draft -> 2.00x, never applied
   await expect(page.getByTestId("load-factor")).toHaveText("2.00x");
-  await expect.poll(() => page.getByTestId("outage-list").textContent(), { timeout: 3000 }).toBe("0"); // outage solve lands
+  // Wait for the outage to actually reach the CONFIRMED (not just pending) scenario -- the SVG only
+  // renders data-outaged once state.disabledLines (post-'solved') includes the line; outage-list reads
+  // pending?.disabledLines, which flips as soon as the request is dispatched and would make this poll
+  // pass trivially before the solve the test is actually trying to race against has even landed.
+  await expect(page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]')).toBeVisible({ timeout: 3000 });
   // the unrelated outage solve resolving must not resync this draft back to 1.00x
   await expect(page.getByTestId("load-factor")).toHaveText("2.00x");
 });

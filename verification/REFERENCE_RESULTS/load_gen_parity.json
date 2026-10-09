@@ -1,7 +1,7 @@
 {
  "meta": {
-  "n": 39,
-  "passed": 39,
+  "n": 40,
+  "passed": 40,
   "tol_rel": 0.001,
   "tol_balance_mw": 0.000001
  },
@@ -508,6 +508,19 @@
    "python_shed": 0,
    "ts_shed": 0,
    "shed_delta_relative": 0,
+   "python_balance_max": 0,
+   "ts_balance_max": 0,
+   "ts_status": "optimal",
+   "pass": true
+  },
+  {
+   "case_id": "combo_line9_cap_x0.95_load_bus7_x4",
+   "python_objective": 79301.9480423927,
+   "ts_objective": 79301.94804239276,
+   "objective_delta_relative": 7.340003915458816e-16,
+   "python_shed": 78.62888900923677,
+   "ts_shed": 78.62888900923683,
+   "shed_delta_relative": 7.229330030865684e-16,
    "python_balance_max": 0,
    "ts_balance_max": 0,
    "ts_status": "optimal",

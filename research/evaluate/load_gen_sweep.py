@@ -27,9 +27,12 @@ def cases():
     yield "combo_gens012_zero", {"gen_pmax_mw": {0: 0.0, 1: 0.0, 2: 0.0}}
     yield "combo_gens01_zero_load_x2", {"gen_pmax_mw": {0: 0.0, 1: 0.0}, "load_scale": {LOAD_BUSES[0]: 2.0}}
     yield "combo_gen0_half_load_x4", {"gen_pmax_mw": {0: GEN_PMAX[0] / 2}, "load_scale": {LOAD_BUSES[1]: 4.0}}
+    # cross-control combo: capacity change (CAS-INT-005) + load increase (CAS-INT-002) on the same
+    # scenario, used by e2e/newControls.spec.ts's AlterCapacity-debounce race test as the expected value
+    yield "combo_line9_cap_x0.95_load_bus7_x4", {"line_capacity_factor": {9: 0.95}, "load_scale": {7: 4.0}}
 
 
-def invariants(r):
+def invariants(r, sc):
     bad = []
     if r["status"] != "optimal":
         return ["status:" + r["status"]]
@@ -39,6 +42,15 @@ def invariants(r):
     for li, f in r["flows"].items():
         if abs(f) > r["line_rating_mw"][li] + 1e-6:
             bad.append(f"line {li} over limit")
+    gp = sc.get("gen_pmax_mw", {}) if isinstance(sc, dict) else {}
+    for g in CASE["gens"]:
+        cap = gp.get(g["idx"], g["pmax_mw"])
+        if r["gen"][g["idx"]] > cap + 1e-6:
+            bad.append(f"gen {g['idx']} over pmax override ({r['gen'][g['idx']]} > {cap})")
+    if abs(r["total_load_mw"] - sum(i["served_mw"] + i["shed_mw"] for i in r["islands"])) > TOL:
+        bad.append("load accounting (load = served + shed per island)")
+    if abs(sum(r["gen"].values()) - sum(i["served_mw"] for i in r["islands"])) > TOL:
+        bad.append("gen != served")
     return bad
 
 
@@ -46,7 +58,7 @@ def main():
     rows = []
     for cid, sc in cases():
         r = solve(CASE, sc)
-        bad = invariants(r)
+        bad = invariants(r, sc)
         rows.append(dict(case_id=cid, scenario=sc, status=r["status"], objective=r["objective"],
                           total_shed=r["total_unserved_mw"], shed_economic=r["shed_economic_mw"],
                           n_islands=len(r["islands"]), per_island_balance=[i["balance_mw"] for i in r["islands"]],
