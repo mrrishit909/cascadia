@@ -1,8 +1,8 @@
 # Progress
 
-Last updated manually, 2026-10-09 (M4 functional phase complete).
+Last updated manually, 2026-10-09 (static visual system landed, networkEncoding pass in progress).
 
-## State: M4 functional/analytical phase COMPLETE, independently verified
+## State: M4 functional/analytical phase COMPLETE and independently verified; visual pass underway
 
 All 7 required interactions (CAS-INT-001 through CAS-INT-007) are implemented and each
 independently adversarially reviewed, with no P0/P1 defects found anywhere:
@@ -18,10 +18,30 @@ Two known pre-existing P2s remain open and tracked (not release-blocking, not to
   detail exist so far, no animation (that's motion-pass scope, see below).
 
 Also fixed along the way: `playwright.config.ts` is now hermetic (fresh build every run, no stale
-server reuse), a React StrictMode bug in `CompareRestoration.tsx`, and GSAP's license was checked
-directly (free for this project's use, not OSI/MIT -- see `CLAUDE.md`).
+server reuse), a React StrictMode bug in `CompareRestoration.tsx`, GSAP's license checked directly
+(free for this project's use, not OSI/MIT -- see `CLAUDE.md`), touch/tap e2e coverage added
+(`e2e/touch.spec.ts`, 5 tests), and the static visual design system applied (`src/index.css`:
+Archivo, color tokens, spacing, component states) with 3 real breakpoint screenshots in
+`verification/SCREENSHOTS/static-visual-system/`.
 
-Test counts as of commit f85aa22: 18/18 vitest, 39/39 e2e, 26/26 pytest, production build clean.
+**Real Lighthouse baseline (`verification/PERFORMANCE/lighthouse_baseline_2026-10-09.json`), measured
+on the production build BEFORE any motion/glow work**: Performance 98, Accessibility 100, LCP 2.1s,
+CLS 0, TBT 0ms, Speed Index 1.8s -- all comfortably inside the quality directive's targets (90+/95+/
+<=2.5s/<=0.1). Worth re-measuring once the glow filter and chapter motion land, since those are the
+likeliest things to cost budget.
+
+**In progress (delegated to an isolated worktree agent, not yet merged as of this writing)**: a
+networkEncoding correctness pass on `src/visualization/NetworkView.tsx` -- the current SVG rendering
+uses several colors that don't match `specifications/DESIGN_SYSTEM.json`'s actual tokens (binding
+lines in fault red instead of copperHot, removed/outaged lines in fault red instead of deEnergized,
+candidate lines in a forbidden ad hoc color `#7FD6B0` instead of diagnosticDim, selection in diagnostic
+blue instead of the text-color bracket treatment), plus the `copper-bloom` glow filter and a real
+in-SVG focus ring are still missing. Check `git log --oneline` for whether this landed; if not, the
+work is described in detail in the Agent-tool call that launched it (search this session's own
+history, or just redo it following `specifications/DESIGN_SYSTEM.json`'s `networkEncoding`/`glow`/
+`componentStates.networkFocusRing` sections directly).
+
+Test counts as of commit 7316566: 18/18 vitest, 44/44 e2e, 26/26 pytest, production build clean.
 
 ## Next: the 6 cinematic chapters (CAS-MOTION-001, the largest unstarted gate)
 
