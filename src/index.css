@@ -1,1 +1,213 @@
-body{margin:0;background:#080D13;color:#E8E4DC}
+/* CASCADIA static visual system. Tokens transcribed from specifications/DESIGN_SYSTEM.json
+   (source of truth; keep this file in lockstep with it). Covers color, typography, spacing,
+   elevation and basic component states for the current flat (pre-chapter) layout. Deferred to the
+   chapter/motion pass: SVG networkEncoding (glow filter, per-state dash patterns, selection
+   brackets, flow pulse) -- NetworkView.tsx currently uses a simplified ad hoc palette, not yet this
+   token set; chapter structure, grid/breakpoint layout, bottom sheet, skip-intro. */
+@import '@fontsource-variable/archivo/wdth.css';
+
+:root {
+  /* color.core */
+  --ink: #080D13;
+  --copper: #EF9C54;
+  --diagnostic: #6FA9BE;
+  /* color.derived */
+  --surface: #0F1722;
+  --raised: #141E2B;
+  --overlay: #18232F;
+  --graticule: #16212C;
+  --hairline: #1F2B38;
+  --de-energized: #5E6B78;
+  --copper-hot: #FFD2A1;
+  --copper-dim: #9C6639;
+  --diagnostic-dim: #3E6A7B;
+  --fault: #E0645A;
+  --text: #E8E4DC;
+  --text-secondary: #9AA5B1;
+  --text-muted: #808C99;
+
+  /* spacing.scale (unit 4) */
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px;
+  --sp-6: 32px; --sp-7: 48px; --sp-8: 64px; --sp-9: 96px; --sp-10: 128px;
+
+  /* borders */
+  --radius-control: 2px;
+  --border-hairline: 1px solid var(--hairline);
+  --border-control: 1px solid var(--de-energized);
+  --border-active: 1px solid var(--copper);
+  --border-error: 1px solid var(--fault);
+
+  /* motion.durationsMs */
+  --dur-micro: 120ms; --dur-feedback: 240ms; --dur-state: 480ms;
+
+  font-family: 'Archivo Variable', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: 'Archivo Variable', 'Arial Narrow', 'Roboto Condensed', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 24px;
+  font-variation-settings: 'wdth' 87.5, 'wght' 420;
+  font-variant-numeric: tabular-nums lining-nums;
+}
+
+#root { min-height: 100vh; }
+
+main {
+  max-width: 1728px;
+  margin: 0 auto;
+  padding: var(--sp-8) var(--sp-9);
+}
+@media (max-width: 1279px) { main { padding: var(--sp-6) var(--sp-7); } }
+@media (max-width: 719px) { main { padding: var(--sp-5) var(--sp-4); } }
+@media (max-width: 374px) { main { padding: var(--sp-4) var(--sp-4); } }
+
+h1 {
+  font-size: clamp(44px, 6.2vw, 92px);
+  line-height: 0.92;
+  font-variation-settings: 'wdth' 62, 'wght' 720;
+  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  margin: 0 0 var(--sp-6);
+  color: var(--text);
+}
+
+section {
+  border: var(--border-hairline);
+  background: var(--surface);
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-5);
+  border-radius: var(--radius-control);
+}
+
+h2 {
+  font-size: 25px;
+  line-height: 28px;
+  font-variation-settings: 'wdth' 70, 'wght' 640;
+  margin: 0 0 var(--sp-4);
+  color: var(--text);
+}
+
+p { margin: 0 0 var(--sp-3); color: var(--text-secondary); max-width: 62ch; }
+p:last-child { margin-bottom: 0; }
+
+code {
+  font-family: ui-monospace, 'SF Mono', monospace;
+  font-size: 0.9em;
+  color: var(--text-muted);
+}
+
+label {
+  font-size: 13px;
+  line-height: 16px;
+  font-variation-settings: 'wdth' 75, 'wght' 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-right: var(--sp-4);
+}
+
+select {
+  background: var(--ink);
+  color: var(--text);
+  border: var(--border-control);
+  border-radius: var(--radius-control);
+  padding: var(--sp-2) var(--sp-3);
+  font: inherit;
+  font-size: 14px;
+  text-transform: none;
+  letter-spacing: normal;
+  min-height: 44px;
+}
+select:disabled { border: 1px solid var(--hairline); color: var(--de-energized); }
+
+button {
+  background: transparent;
+  color: var(--copper);
+  border: var(--border-active);
+  border-radius: var(--radius-control);
+  padding: var(--sp-2) var(--sp-4);
+  font: inherit;
+  font-size: 13px;
+  font-variation-settings: 'wdth' 75, 'wght' 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  min-height: 44px;
+  transition: background var(--dur-micro) ease, color var(--dur-micro) ease, border-color var(--dur-micro) ease;
+}
+button:hover:not(:disabled) { background: rgba(239, 156, 84, 0.12); color: var(--copper-hot); }
+button:active:not(:disabled) { background: var(--copper); color: var(--ink); }
+button:disabled { border: 1px solid var(--hairline); color: var(--de-energized); cursor: not-allowed; }
+button[aria-pressed="true"] { background: var(--copper); color: var(--ink); }
+
+input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--copper);
+}
+
+input[type="range"] {
+  accent-color: var(--copper);
+  height: 44px;
+  vertical-align: middle;
+}
+
+:focus-visible {
+  outline: 2px solid var(--copper);
+  outline-offset: 2px;
+}
+/* SVG network elements use a distinct focus treatment (networkFocusRing): warm white, not copper,
+   so it never reads as "energized" -- see networkEncoding.selectionOverlay in DESIGN_SYSTEM.json. */
+svg [role="button"]:focus-visible { outline: none; } /* ring drawn in-SVG, see NetworkView.tsx TODO */
+
+[role="alert"] {
+  color: var(--fault);
+  border: var(--border-error);
+  background: var(--overlay);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-control);
+  margin-bottom: var(--sp-3);
+}
+
+[role="status"] {
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.provenance {
+  color: var(--text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border-top: var(--border-hairline);
+  padding-top: var(--sp-3);
+  margin-top: var(--sp-6);
+}
+
+ul, ol {
+  padding-left: var(--sp-5);
+  margin: 0 0 var(--sp-3);
+}
+li { margin-bottom: var(--sp-2); color: var(--text-secondary); }
+
+output {
+  font-variant-numeric: tabular-nums lining-nums;
+  color: var(--text);
+  font-weight: 600;
+}
+
+strong { color: var(--text); font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
+}
