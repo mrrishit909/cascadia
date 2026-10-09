@@ -48,7 +48,7 @@
         "cas_int_001_control",
         "cas_int_005_control"
       ],
-      "status": "pending",
+      "status": "done",
       "prompt_file": "n1_parity_ts_vs_python.txt",
       "test_cmd": "npm run test"
     },

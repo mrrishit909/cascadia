@@ -10,6 +10,6 @@ export default defineConfig({
     setupFiles: './src/test-setup.ts',
     // vitest's default glob also matches Playwright's e2e/*.spec.ts, which
     // errors because those files call test() outside Playwright's runner.
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    include: ['src/**/*.{test,spec}.{ts,tsx}', 'tests/unit/**/*.test.ts'],
   },
 })
