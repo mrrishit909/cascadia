@@ -58,7 +58,7 @@
       "depends_on": [
         "cas_int_001_control"
       ],
-      "status": "pending",
+      "status": "done",
       "prompt_file": "e2e_keyboard_test.txt",
       "test_cmd": "npm run build && npm run test:e2e"
     },
