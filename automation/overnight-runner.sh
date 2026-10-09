@@ -148,6 +148,13 @@ if [ "$TEST_EXIT" -ne 0 ]; then
   exit 1
 fi
 
+# Update the queue's own status to "done" BEFORE staging/committing, so the
+# status change is captured in the same commit as the task's file changes --
+# otherwise it's left uncommitted, and the NEXT fire's clean-tree safety
+# check refuses to start (this exact bug was caught by the Phase 13 trial
+# run: task 1 succeeded and committed, but "done" never made it into git).
+python3 "$REPO/automation/queue.py" update-status "$TASK_ID" done
+
 git add -A
 COMMIT_MSG="Overnight runner: $TASK_ID
 
@@ -169,7 +176,6 @@ if [ "$COMMIT_EXIT" -ne 0 ]; then
   exit 1
 fi
 
-python3 "$REPO/automation/queue.py" update-status "$TASK_ID" done
 NEW_COMMIT="$(git rev-parse HEAD)"
 log "Task $TASK_ID done. Committed $NEW_COMMIT"
 
