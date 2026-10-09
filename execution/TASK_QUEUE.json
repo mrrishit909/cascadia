@@ -69,7 +69,7 @@
         "cas_int_001_control",
         "cas_int_005_control"
       ],
-      "status": "pending",
+      "status": "done",
       "prompt_file": "reset_interruption_tests.txt",
       "test_cmd": "npm run build && npm run test && npm run test:e2e"
     },

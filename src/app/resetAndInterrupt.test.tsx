@@ -1,0 +1,99 @@
+// Acceptance: "Exact reset" (deep-equal full AppState) and "Interruption safety" (latest request wins).
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import highsLoader from 'highs'
+import { afterEach, expect, it, vi } from 'vitest'
+import { solveDcopf } from '../engine/dcopf'
+import { createLpClient, type WorkerLike } from '../workers/lpClient'
+import type { LpRequest } from '../workers/lpWorker'
+import { Scene } from './App'
+import { AppProvider, useApp, type AppState } from './state'
+
+const files = import.meta.glob('/public/data/**/*.json', { import: 'default' }) as Record<string, () => Promise<unknown>>
+afterEach(() => vi.unstubAllGlobals())
+const stubFetch = () => vi.stubGlobal('fetch', async (url: string) => ({
+  ok: true, json: async () => (await files[`/public${url.slice(url.indexOf('/data/'))}`]()),
+}))
+
+async function setup(solver: Parameters<typeof AppProvider>[0]['solver']) {
+  stubFetch()
+  const h: { state: AppState; api: ReturnType<typeof useApp> } = {} as never
+  const Probe = () => { h.api = useApp(); h.state = h.api.state; return null }
+  render(<AppProvider solver={solver}><Probe /><Scene /></AppProvider>)
+  await screen.findAllByTestId('bus')
+  return h
+}
+
+it('CAS-INT-001: reset after bus removal deep-equals the post-load state', async () => {
+  const highs = await highsLoader()
+  const h = await setup(async (c, sc) => solveDcopf(c, highs, sc))
+  const before = structuredClone(h.state)
+  const bus = screen.getAllByTestId('bus')[26]
+  bus.focus(); fireEvent.keyDown(bus, { key: 'Enter' })
+  fireEvent.click(screen.getByText('Confirm removal'))
+  await waitFor(() => expect(h.state.removedBus).toBe(26))
+  expect(h.state).not.toEqual(before)
+  fireEvent.click(screen.getByText('Reset to baseline'))
+  expect(h.state).toEqual(before)
+})
+
+it('CAS-INT-005: reset after capacity change deep-equals the post-load state', async () => {
+  const highs = await highsLoader()
+  const h = await setup(async (c, sc) => solveDcopf(c, highs, sc))
+  const before = structuredClone(h.state)
+  const line = screen.getAllByTestId('line')[9]
+  line.focus(); fireEvent.keyDown(line, { key: 'Enter' })
+  fireEvent.change(screen.getByRole('slider'), { target: { value: '0.5' } })
+  await waitFor(() => expect(h.state.lineCapacity).toEqual({ 9: 0.5 }), { timeout: 3000 })
+  expect(h.state).not.toEqual(before)
+  fireEvent.click(screen.getByText('Reset to baseline'))
+  expect(h.state).toEqual(before)
+})
+
+it('interruption: bus A then bus B; A reply arrives last yet only B is stored/displayed', async () => {
+  const highs = await highsLoader()
+  const held: (() => void)[] = []
+  const worker: WorkerLike = {
+    onmessage: null,
+    postMessage(m: LpRequest) {
+      const result = solveDcopf(m.case, highs, m.scenario)
+      held.push(() => worker.onmessage?.({ data: { id: m.id, ok: true, result } }))
+    },
+  }
+  const client = createLpClient(worker)
+  const h = await setup((c, sc) => client.solve(c, sc))
+  let a!: Promise<void>, b!: Promise<void>
+  act(() => { a = h.api.removeBus(26) })
+  act(() => { b = h.api.removeBus(5) }) // same stale closure is fine: both read the loaded network
+  expect(held).toHaveLength(2)
+  await act(async () => { held[1](); await b }) // B resolves first
+  expect(h.state.removedBus).toBe(5)
+  const afterB = structuredClone(h.state)
+  await act(async () => { held[0](); await a }) // stale A reply arrives late
+  expect(h.state).toEqual(afterB)
+  expect(h.state.result?.id).toBe('bus_removal_5')
+  expect(h.state.solve).toBe('idle')
+})
+
+it('interruption: A reply arriving before B is submitted-complete is dropped, no error state', async () => {
+  const highs = await highsLoader()
+  const held: (() => void)[] = []
+  const worker: WorkerLike = {
+    onmessage: null,
+    postMessage(m: LpRequest) {
+      const result = solveDcopf(m.case, highs, m.scenario)
+      held.push(() => worker.onmessage?.({ data: { id: m.id, ok: true, result } }))
+    },
+  }
+  const client = createLpClient(worker)
+  const h = await setup((c, sc) => client.solve(c, sc))
+  let a!: Promise<void>, b!: Promise<void>
+  act(() => { a = h.api.removeBus(26) })
+  act(() => { b = h.api.removeBus(5) })
+  await act(async () => { held[0](); await a }) // A first (in order), already superseded
+  expect(h.state.removedBus).toBeNull()
+  expect(h.state.solve).toBe('solving')
+  expect(h.state.solveError).toBeUndefined()
+  await act(async () => { held[1](); await b })
+  expect(h.state.result?.id).toBe('bus_removal_5')
+  expect(h.state.removedBus).toBe(5)
+})
