@@ -1,0 +1,17 @@
+Use the Agent tool to invoke the 'adversarial-reviewer' subagent (.claude/agents/adversarial-reviewer.md) with this task:
+
+You're in ~/cascadia. Read ~/creative-engineering/docs/planning/cascadia/PROTOTYPE_ACCEPTANCE_CRITERIA.md -- this is the checklist you are verifying, independently, not summarizing from memory.
+
+Re-derive the evidence for every checklist item yourself, right now, don't trust any prior agent's report of success:
+1. N-1 parity sweep: open verification/REFERENCE_RESULTS/ts_python_parity.json yourself, count actual pass/fail.
+2. Per-island balance: confirm from the same file.
+3. Keyboard-only e2e: run `npm run build && npm run test:e2e` yourself, read the actual result.
+4. Exact reset: run `npm run test` yourself, check the reset test specifically.
+5. Interruption safety: same, check that specific test.
+6. No fake numbers: read verification/NO_FAKE_NUMBERS_AUDIT.md, confirm VIOLATION count is 0.
+
+Write `verification/PROTOTYPE_REPORT.md` with the Atlas's own required final-response format (per ~/creative-engineering/docs/extracted/EXECUTION_PROTOCOL.md): scope delivered, requirement counts by status (check specifications/REQUIREMENTS.yaml), build/test commands + exit codes, the actual N-1 parity numbers, screenshot locations, open risks/defects, exact next steps.
+
+CRITICAL: This report must NOT claim CASCADIA is complete or production-ready. The prototype is explicitly scoped to 2 of 7 required interactions (CAS-INT-001, CAS-INT-005), no motion choreography, no responsive breakpoints beyond basic function, no deployment, no accessibility audit beyond keyboard operability of the 2 controls built. State clearly: "prototype acceptance criteria [met/not met], full CASCADIA implementation requires M4 (remaining 5 interactions + 6 chapters' motion), M5 (full QA), M6 (deployment) -- see IMPLEMENTATION_PLAN.md task graph." If any individual checklist item did NOT pass, say so explicitly and do not round it into an overall "mostly working" claim.
+
+Report back verbatim what you wrote to PROTOTYPE_REPORT.md's "scope delivered" and "requirement counts by status" sections.

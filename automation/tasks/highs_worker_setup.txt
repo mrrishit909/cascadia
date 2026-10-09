@@ -1,0 +1,15 @@
+Use the Agent tool to invoke the 'frontend-engineer' subagent (.claude/agents/frontend-engineer.md) with this task:
+
+You're in ~/cascadia. Read CLAUDE.md first -- the browser LP solver choice is already resolved: `highs` (npm, MIT-licensed, WASM build of the HiGHS solver). Never use glpk.js (GPL). Read research/models/oracle.py to understand the exact LP formulation you need to replicate in TypeScript (island-aware DC-OPF: per-island nodal balance, PTDF-based line-flow limits, generator Pmin/Pmax, piecewise-linearized costs, shed variables bounded by load). Read specifications/DATA_CONTRACT.yaml for the formulation notes (VOLL=1000 EUR/MWh synthetic assumption, 4-segment piecewise linearization, line rating conversion formula).
+
+Your task:
+
+1. `npm install highs` (confirm it's the MIT-licensed npm package named exactly `highs`, not a different package -- verify via `npm view highs license` before installing).
+2. Build src/workers/lpWorker.ts: a Web Worker that loads the highs WASM module, accepts a problem description (bus/line/generator/load data plus a scenario like "removed bus" or "line capacity override"), builds the exact same LP formulation as research/models/oracle.py (same island detection via a hand-rolled connected-components pass -- the problem is 30 nodes/41 edges, far too small for a graph library dependency, per this repo's own CLAUDE.md), and returns the solve result (objective, per-bus dispatch, per-line flow, shed amounts, per-island balance, status).
+3. The Worker must support cancellation: if a new request arrives before the previous one resolves, the previous one's result must never be used (store a request ID, ignore stale responses).
+4. One unit test (Vitest) that solves the baseline case30 scenario (no changes) in the TS Worker and checks the objective is within 1e-3 relative tolerance of the Python oracle's baseline objective (566.8693625 -- read public/data/precomputed/baseline.json for the authoritative value, don't hardcode from memory).
+5. One unit test for cancellation: fire two requests rapidly, assert only the second result is ever returned.
+
+This is a nontrivial numerical port -- read oracle.py's solve() function carefully and replicate its math, don't approximate it. If you hit a genuine ambiguity in the formulation that oracle.py's code comments don't resolve, make the most conservative choice that keeps parity with the Python oracle and document it in a code comment, don't silently diverge.
+
+Run `npm run build && npm run test` yourself before finishing and fix anything that fails. Report back: files created, the baseline parity test's actual delta (not just pass/fail), and any formulation ambiguity you had to resolve.

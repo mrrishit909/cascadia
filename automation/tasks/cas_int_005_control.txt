@@ -1,0 +1,17 @@
+Use the Agent tool to invoke the 'frontend-engineer' subagent (.claude/agents/frontend-engineer.md) with this task:
+
+You're in ~/cascadia. Read CLAUDE.md, specifications/REQUIREMENTS.yaml (row CAS-INT-005 has the exact given/when/then contract), src/workers/lpWorker.ts, and the existing src/app and src/visualization skeleton plus whatever CAS-INT-001's control added (read it for the established pattern -- reuse the same Worker-call/loading-state/reset conventions, don't invent a second pattern).
+
+Build CAS-INT-005 end to end: "alter line capacity".
+
+1. A control (select a line in the SVG network view, adjust its thermal capacity via a slider or input -- keyboard-operable) that lets the user change one line's capacity factor (the oracle/Worker should already support this parameter, matching research/models/oracle.py and the capacity-factor scenarios in verification/REFERENCE_RESULTS/n1_sweep.json, e.g. factors 0.5/0.25/1.5).
+2. Wire it to the Worker: on change (debounced, don't fire a solve on every pixel of slider drag), send the capacity-change scenario, show loading, update the visualization: the affected line's visual state should reflect whether the new capacity is now binding (constraint actively limiting flow) vs slack, per the dossier's "refreshed edges" requirement.
+3. Infeasible case: at low enough capacity with shedding disabled, the LP can be genuinely infeasible (see public/data/scenarios/infeasible.json for the real fixture -- line 9 at 0.25x with allow_shed=false). Your control should expose an "allow shedding" toggle or default to allow_shed=true (matching the other controls) -- state clearly in a code comment which you chose and why, since this affects whether users ever see the infeasible diagnostic through this control.
+4. Reset/undo: restores exact baseline.
+5. Keyboard support: full keyboard path for selecting a line and adjusting capacity (arrow keys on a focused slider is a reasonable pattern).
+
+Write a component test asserting: changing a line's capacity to a value that's known (from verification/REFERENCE_RESULTS/n1_sweep.json) to bind a constraint shows the correct binding-line indicator, and reset restores baseline exactly.
+
+Hard constraint: displayed numbers (binding status, flow values) must come from the Worker's real solve, never hardcoded/interpolated/animation-derived.
+
+Run `npm run build && npm run test` yourself before finishing and fix anything that fails. Update specifications/REQUIREMENTS.yaml's CAS-INT-005 row status to "implemented". Report back: files created/changed, test pass/fail, which real capacity-change case your test exercises, and your allow_shed default decision.

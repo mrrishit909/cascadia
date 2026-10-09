@@ -1,0 +1,56 @@
+# CASCADIA data contract (schema per ~/creative-engineering/docs/extracted/ENGINEERING_STANDARDS.md)
+version: 1
+datasets:
+  - id: case30
+    path: public/data/raw-metadata/case30.json
+    label: REAL_IEEE_BENCHMARK
+    provenance:
+      chain:
+        - "PYPOWER case30 (https://github.com/rwl/PYPOWER)"
+        - "Univ. of Washington Power Systems Test Case Archive, 30 Bus Power Flow Test Case (http://labs.ece.uw.edu/pstca/)"
+        - "pandapower pandapower.networks.case30() (BSD-3-Clause, Kassel/Fraunhofer IEE)"
+      license: "pandapower BSD-3-Clause. Underlying IEEE/UW benchmark: open academic benchmark; separate license text not located (TODO confirm)."
+      accessed: "see provenance.date_accessed in the file"
+      checksum: "sha256 of file in public/data/provenance/manifest.json; data_sha256 (canonical JSON of payload) inside file"
+    fields:
+      buses: {idx: "int, 0-based", name: "str, IEEE 1-based number", vn_kv: "kV", zone: "-", x: "schematic", y: "schematic"}
+      lines: {idx: int, from_bus: int, to_bus: int, r_ohm: ohm, x_ohm: ohm, max_i_ka: kA, x_pu: "p.u. on 100 MVA", rating_mw: "MW = sqrt3*kV*kA (derived)"}
+      gens: {idx: int, bus: int, pmin_mw: MW, pmax_mw: MW, c0: EUR, c1: "EUR/MWh", c2: "EUR/MW^2h", source: "gen|ext_grid"}
+      loads: {bus: int, p_mw: MW}
+    nulls: "none permitted; validated by oracle (_validate): x_pu>0, indices in range"
+    time_zone_crs: "n/a (static snapshot; coordinates are schematic, not geographic)"
+  - id: scenarios
+    path: public/data/scenarios/*.json
+    label: HYPOTHETICAL_COUNTERFACTUAL
+    fields: {id: str, params: "scenario object (see oracle docstring)", case_sha256: str, seed: "null (deterministic)", voll_eur_per_mwh: float, cost_segments: int}
+  - id: precomputed
+    path: public/data/precomputed/*.json
+    label: "SIMULATED (oracle output, not observed)"
+    fields: {result: "oracle.solve output", oracle_sha256: str, limitations: list}
+model:
+  oracle: research/models/oracle.py
+  solver: "scipy.optimize.linprog method=highs (primary); pandapower rundcpp/rundcopp cross-check only"
+  formulation: "per-island min sum(PWL cost)+VOLL*shed; nodal balance; |PTDF.inj|<=Fmax; Pmin<=P<=Pmax; 0<=shed<=load. No global slack bus."
+  assumptions:
+    voll_eur_per_mwh: {value: 1000, label: SYNTHETIC_ASSUMPTION, note: "not in IEEE data; >> max marginal cost (~12 EUR/MWh), so shedding is last resort"}
+    cost_linearization: "4 equal-width secant segments over [Pmin,Pmax]; overestimates true quadratic by <=0.7% in tests"
+    pmin_override: "if Pmax override < Pmin, Pmin relaxed to Pmax"
+    line_rating: "thermal MW = sqrt3 * V_from * max_i_ka, current limit applied to |P| (reactive ignored)"
+    ext_grid: "treated as ordinary generator idx 0 with its own Pmax/cost"
+  outputs_semantics:
+    unserved_removed_mw: "load at removed substations (not a solver decision)"
+    shed_no_generation_mw: "load in islands with no generation (100% shed, no solve)"
+    shed_economic_mw: "LP-chosen shedding in islands with generation"
+    status: "optimal | infeasible (infeasible only when allow_shed=false)"
+tolerances:
+  island_balance_mw: 1.0e-6
+  line_limit_mw: 1.0e-6
+  parity_objective_shed_relative: 1.0e-3
+  degeneracy: "compare objective, total shed, per-island balance, not individual setpoints (alternate optima possible)"
+test_vectors:
+  CAS-INT-001: {fixture: precomputed/islanding.json, expect: "shed_no_generation_mw=13.0, unserved_removed_mw=0 (removing idx 26)", also: "bus_removal_11 -> unserved_removed_mw=11.2"}
+  CAS-INT-005: {fixture: "precomputed/infeasible.json (line 9 x0.25, allow_shed=false -> status infeasible)", sweep: "line_cap_9_x0.5 -> shed_economic_mw=5.2996, binding [9,28,29]"}
+  baseline: {fixture: precomputed/baseline.json, objective: 566.8693625, total_unserved_mw: 0}
+regeneration: |
+  uv run python -m research.ingest.export_case30 && uv run python -m research.evaluate.n1_sweep && uv run python -m research.export.export_fixtures
+  (export_case30 stamps date_accessed; rerun changes case30.json, so re-run export_fixtures after)

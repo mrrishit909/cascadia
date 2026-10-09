@@ -1,0 +1,11 @@
+Use the Agent tool to invoke the 'adversarial-reviewer' subagent (.claude/agents/adversarial-reviewer.md) with this task:
+
+You're in ~/cascadia. Read CLAUDE.md's hard rules: "Never derive a displayed numeric value from Date.now(), Math.random(), or animation progress." This is the exact standard ~/creative-engineering/docs/planning/cascadia/PROTOTYPE_ACCEPTANCE_CRITERIA.md's final checklist item uses.
+
+Run `grep -rn "Date.now()\|Math.random()" src/` and review every match. For each one, determine: does this feed a *displayed numeric value* (MW, percentage, count, any number the user sees as data), or is it purely cosmetic (animation timing, a React key, a debounce timestamp)? Write your disposition for every single match to `verification/NO_FAKE_NUMBERS_AUDIT.md`: the file, line, the code snippet, and your verdict (SAFE - cosmetic only / VIOLATION - feeds displayed data).
+
+Also independently spot-check: pick one of the two implemented controls (CAS-INT-001 or CAS-INT-005) and trace its displayed unserved-MW or binding-status value backward through the actual code, from the DOM render back to the Worker's solve() call -- confirm for yourself it's a real computed value, don't just trust the component's variable naming (a variable called `realUnservedMW` that's actually `Math.random() * 50` would pass a naive grep-only check if poorly named; read the actual data flow).
+
+If you find any VIOLATION, this is a P0 finding per your own agent definition's severity policy -- report it clearly, and if it's a small, obviously-correct fix (e.g. a leftover placeholder), fix it directly and note what you changed; if it requires understanding intent you don't have, leave it unfixed and flag it loudly rather than guessing.
+
+Report back: total matches found, SAFE count, VIOLATION count (should be 0), and the result of your manual trace-through on the control you picked.

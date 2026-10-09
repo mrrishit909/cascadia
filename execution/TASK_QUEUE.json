@@ -1,0 +1,76 @@
+{
+  "tasks": [
+    {
+      "id": "frontend_scene_skeleton",
+      "description": "Build the app scene skeleton and state architecture for the 2D SVG network view",
+      "depends_on": [],
+      "status": "pending",
+      "prompt_file": "frontend_scene_skeleton.txt",
+      "test_cmd": "npm run build && npm run test"
+    },
+    {
+      "id": "highs_worker_setup",
+      "description": "Install highs (MIT, WASM) and build a Worker wrapper with a smoke test",
+      "depends_on": [],
+      "status": "pending",
+      "prompt_file": "highs_worker_setup.txt",
+      "test_cmd": "npm run build && npm run test"
+    },
+    {
+      "id": "cas_int_001_control",
+      "description": "Build the node-removal control wired to the Worker LP",
+      "depends_on": ["frontend_scene_skeleton", "highs_worker_setup"],
+      "status": "pending",
+      "prompt_file": "cas_int_001_control.txt",
+      "test_cmd": "npm run build && npm run test"
+    },
+    {
+      "id": "cas_int_005_control",
+      "description": "Build the line-capacity-change control wired to the Worker LP",
+      "depends_on": ["frontend_scene_skeleton", "highs_worker_setup"],
+      "status": "pending",
+      "prompt_file": "cas_int_005_control.txt",
+      "test_cmd": "npm run build && npm run test"
+    },
+    {
+      "id": "n1_parity_ts_vs_python",
+      "description": "Run the N-1 sweep in TS against case30 and compare to the Python oracle's n1_sweep.json",
+      "depends_on": ["cas_int_001_control", "cas_int_005_control"],
+      "status": "pending",
+      "prompt_file": "n1_parity_ts_vs_python.txt",
+      "test_cmd": "npm run test"
+    },
+    {
+      "id": "e2e_keyboard_test",
+      "description": "Playwright test: remove a substation via keyboard only, assert displayed unserved MW",
+      "depends_on": ["cas_int_001_control"],
+      "status": "pending",
+      "prompt_file": "e2e_keyboard_test.txt",
+      "test_cmd": "npm run build && npm run test:e2e"
+    },
+    {
+      "id": "reset_interruption_tests",
+      "description": "Exact-reset test and Worker-interruption-safety test",
+      "depends_on": ["cas_int_001_control", "cas_int_005_control"],
+      "status": "pending",
+      "prompt_file": "reset_interruption_tests.txt",
+      "test_cmd": "npm run build && npm run test && npm run test:e2e"
+    },
+    {
+      "id": "no_fake_numbers_audit",
+      "description": "Adversarial grep audit for Date.now()/Math.random() feeding displayed values",
+      "depends_on": ["cas_int_001_control", "cas_int_005_control"],
+      "status": "pending",
+      "prompt_file": "no_fake_numbers_audit.txt",
+      "test_cmd": ""
+    },
+    {
+      "id": "prototype_acceptance_report",
+      "description": "Compile PROTOTYPE_ACCEPTANCE_CRITERIA.md checklist with real evidence",
+      "depends_on": ["n1_parity_ts_vs_python", "e2e_keyboard_test", "reset_interruption_tests", "no_fake_numbers_audit"],
+      "status": "pending",
+      "prompt_file": "prototype_acceptance_report.txt",
+      "test_cmd": ""
+    }
+  ]
+}

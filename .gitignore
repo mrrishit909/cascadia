@@ -2,3 +2,15 @@ node_modules/
 dist/
 playwright-report/
 test-results/
+.venv
+__pycache__
+.pytest_cache
+
+# overnight runner (local-only, never committed)
+logs/
+automation/*.lock
+automation/STOP
+automation/RUNNER_PID
+.venv/
+__pycache__/
+.pytest_cache/

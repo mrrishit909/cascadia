@@ -1,0 +1,13 @@
+Use the Agent tool to invoke the 'qa-engineer' subagent (.claude/agents/qa-engineer.md) with this task:
+
+You're in ~/cascadia. Read CLAUDE.md and ~/creative-engineering/docs/planning/cascadia/PROTOTYPE_ACCEPTANCE_CRITERIA.md's "Keyboard-only e2e" checklist item. Read the CAS-INT-001 control built by a prior task (grep specifications/REQUIREMENTS.yaml or src/ for how it was implemented -- find the actual component/control).
+
+Write a Playwright test in e2e/ that:
+1. Runs against the production preview (`npm run build && npm run preview`), never dev server -- see playwright.config.ts for the existing pattern.
+2. Navigates the app using ONLY keyboard events (Tab, Enter, Space, arrow keys, Escape) -- no `.click()` calls, verify this by reading your own test file before finishing: zero pointer/mouse method calls.
+3. Selects a substation (bus) known from verification/REFERENCE_RESULTS/n1_sweep.json to cause nonzero unserved load when removed, confirms the removal via keyboard, and asserts the displayed unserved MW text exactly equals that case's `total_shed` value from the sweep JSON (read it at test-time, don't hardcode a magic number -- if the fixture changes, the test should still be correct).
+4. Takes a screenshot at this state into verification/SCREENSHOTS/.
+
+Run `npm run build && npm run test:e2e` yourself and fix anything that fails. If the control genuinely cannot be operated via keyboard alone (a real accessibility bug), that's a finding to report, not something to route around with a workaround click -- flag it honestly in your final report and leave the test failing with a clear comment rather than weakening the assertion or adding a mouse fallback.
+
+Report back: the test file path, pass/fail, and if it failed, the exact reason (missing keyboard handler, wrong displayed value, etc).

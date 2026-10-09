@@ -1,0 +1,13 @@
+Use the Agent tool to invoke the 'qa-engineer' subagent (.claude/agents/qa-engineer.md) with this task:
+
+You're in ~/cascadia. Read CLAUDE.md and ~/creative-engineering/docs/planning/cascadia/PROTOTYPE_ACCEPTANCE_CRITERIA.md's first checklist item: "N-1 parity sweep... TS Worker and Python oracle agree on objective value (relative tolerance 1e-3), total shed (relative tolerance 1e-3), and per-island balance (absolute tolerance 1e-6 MW)."
+
+Read verification/REFERENCE_RESULTS/n1_sweep.json -- this is the Python oracle's full 195-case sweep (already independently verified: 195/195 pass invariants, max per-island balance error 2.8e-14 MW). Read src/workers/lpWorker.ts to understand how to call the TS solver programmatically (you may need a small Node-callable test harness around it rather than going through the browser, if the Worker is structured for browser-only use -- use your judgment, document what you built).
+
+Your task: run the SAME 195 cases (every bus removal, every line-capacity-factor change, every line outage -- read n1_sweep.json's case definitions) through the TS Worker LP, and produce a parity report: `verification/REFERENCE_RESULTS/ts_python_parity.json`, one row per case: `{case_id, python_objective, ts_objective, objective_delta_relative, python_shed, ts_shed, shed_delta_relative, python_balance_max, ts_balance_max, pass}`.
+
+A case passes if objective and shed deltas are within 1e-3 relative AND the TS balance is within 1e-6 MW absolute. Per IMPLEMENTATION_PLAN.md's degeneracy note: do NOT compare individual generator dispatch values, only objective/shed/balance -- two correct LP solvers can disagree on degenerate ties.
+
+Report the ACTUAL pass count out of 195, not a summary claim. If fewer than 195 pass, list every failing case_id with its actual deltas -- do not average away failures or round them into looking acceptable. This is independent verification of someone else's prior work (the TS Worker was built by frontend-engineer in earlier tasks) -- be skeptical, re-derive, don't just trust the TS code's own self-tests.
+
+Run this as an actual script (Node or a Vitest test file, your choice) committed under tests/unit/ or research/evaluate/, not a one-off you throw away. Report back: the exact pass/fail count, every failing case if any, and the script's location so it can be re-run.

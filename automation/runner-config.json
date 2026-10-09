@@ -1,0 +1,7 @@
+{
+  "max_retries_per_task": 3,
+  "max_consecutive_runner_failures": 3,
+  "max_single_task_seconds": 1800,
+  "fire_interval_seconds": 1200,
+  "notes": "max_single_task_seconds: kill a stuck claude -p call after 30min. fire_interval_seconds: launchd StartInterval, matches the automation/com.cascadia.overnight-runner.plist value -- change both together."
+}

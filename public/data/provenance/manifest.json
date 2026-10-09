@@ -1,0 +1,13 @@
+{
+ "version": 1,
+ "oracle_sha256": "df123bbcf730dccd18814451be6f9c415aabab72f752c3dbe704385d03f7373d",
+ "files": {
+  "precomputed/baseline.json": "d20aeeb0558dab777eb33af07e5bf1d4dd680dd30cc25603230eaaf9cb991ad8",
+  "precomputed/infeasible.json": "eb66753f99d19f57e5e7bc24d609a72e11f3538c737069c5d8479dfb2dff7ac2",
+  "precomputed/islanding.json": "989b433bde44f6e0ad1d1ef69aea821579af2bb482c0614be2526e3085b6fa26",
+  "raw-metadata/case30.json": "b24b03f5c37db70b685bf995c6ef233d02c7e5472f8e00ffca7e864f04014ff3",
+  "scenarios/baseline.json": "3bc916d6b46be948375220b6f27eae42071a8d3d3c73633ee039906b86bc55d0",
+  "scenarios/infeasible.json": "2608eb330b39bbd168bb119b4ec107f2d6dcde71d6a4e8348b7c6b6e05c7fbe2",
+  "scenarios/islanding.json": "e90fd81ed408e86f4eca5922b87e4706b8b4a2d3e282aed8c7e474c31442cc40"
+ }
+}

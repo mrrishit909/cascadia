@@ -1,0 +1,21 @@
+{
+ "case": "raw-metadata/case30.json",
+ "case_sha256": "b24b03f5c37db70b685bf995c6ef233d02c7e5472f8e00ffca7e864f04014ff3",
+ "cost_segments": 4,
+ "data_labels": {
+  "scenario": "HYPOTHETICAL_COUNTERFACTUAL",
+  "topology_and_ratings": "REAL_IEEE_BENCHMARK",
+  "voll": "SYNTHETIC_ASSUMPTION"
+ },
+ "description": "Line idx 9 capacity x0.25 with shedding disabled (allow_shed=false): the thermal limit makes the island LP genuinely infeasible; the diagnostic is exposed instead of a clamped number.",
+ "deterministic": true,
+ "id": "infeasible",
+ "params": {
+  "allow_shed": false,
+  "line_capacity_factor": {
+   "9": 0.25
+  }
+ },
+ "seed": null,
+ "voll_eur_per_mwh": 1000.0
+}

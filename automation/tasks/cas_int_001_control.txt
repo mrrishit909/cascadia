@@ -1,0 +1,18 @@
+Use the Agent tool to invoke the 'frontend-engineer' subagent (.claude/agents/frontend-engineer.md) with this task:
+
+You're in ~/cascadia. Read CLAUDE.md, specifications/REQUIREMENTS.yaml (row CAS-INT-001 has the exact given/when/then contract), src/workers/lpWorker.ts (built by a prior task -- read it, don't rebuild it), and the existing src/app and src/visualization skeleton (built by a prior task -- extend it, don't replace it).
+
+Build CAS-INT-001 end to end: "Remove node" (substation removal).
+
+1. A control (button/select on a bus in the SVG network view, or a dedicated panel -- your call, but it must be keyboard-operable, not just clickable) that lets the user select a bus and confirm its removal.
+2. Wire it to src/workers/lpWorker.ts: on confirm, send a "removed bus" scenario to the Worker, show a loading state while it solves, then update the visualization with the result (unserved MW shown explicitly, affected regions visually distinguished per the DESIGN_SYSTEM.json diagnostic-blue token).
+3. If removal causes an island with no generation, the Worker will return a fully-shed island -- display this distinctly from economically-shed load (different label/color), matching the oracle's own shed_economic vs shed_no_generation distinction in research/models/oracle.py.
+4. If the LP comes back infeasible (shouldn't normally happen for a bus removal since shedding makes it always feasible, per DATA_CONTRACT.yaml's assumptions -- but handle it anyway), show the infeasible diagnostic, don't silently fail.
+5. Reset/undo: restores the exact baseline state (same object reference/deep-equal to the initial loaded state, not just a visual reset).
+6. Keyboard support: Tab to a bus, Enter/Space to select removal, another key or button to confirm, Escape to cancel. No pointer-only path.
+
+Write a component test using Testing Library asserting: selecting and confirming a bus removal updates the displayed unserved MW to a value matching the pre-known fixture result (cross-check against public/data/scenarios and precomputed JSON for a bus you pick that causes shedding -- read verification/REFERENCE_RESULTS/n1_sweep.json for a case with nonzero total_shed, e.g. one of the documented multi-island or shed cases), and that reset restores the baseline exactly.
+
+Hard constraint: the displayed unserved MW must come from the Worker's actual solve result, never from a hardcoded or interpolated value. Grep your own new code for Date.now()/Math.random() feeding any displayed number before finishing -- there should be none.
+
+Run `npm run build && npm run test` yourself before finishing and fix anything that fails. Update specifications/REQUIREMENTS.yaml's CAS-INT-001 row status to "implemented" (not "tested"/"verified" -- that's QA's job in a later task). Report back: files created/changed, the test's actual pass/fail, and which real bus-removal case your test exercises.

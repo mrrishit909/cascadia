@@ -1,0 +1,15 @@
+Use the Agent tool to invoke the 'frontend-engineer' subagent (.claude/agents/frontend-engineer.md) with this task:
+
+You're in ~/cascadia. Read CLAUDE.md first. Read specifications/DESIGN_SYSTEM.json (written by creative-director) and specifications/DATA_CONTRACT.yaml and research/models/oracle.py (written by data-ai-engineer) to understand the data shapes you'll be rendering. Read public/data/scenarios/baseline.json for a real example of the fixture shape.
+
+Build the application scene skeleton for CASCADIA's prototype (per ~/creative-engineering/docs/planning/cascadia/PROTOTYPE_ACCEPTANCE_CRITERIA.md -- this is 2D SVG only, no WebGL, no motion choreography yet, just the structural skeleton and state architecture that later tasks will wire controls into):
+
+1. src/app: top-level App component, loads public/data/scenarios/baseline.json on mount, holds it in state.
+2. src/engine: a TypeScript module defining the case30 network's TypeScript types (buses, lines, generators, loads) matching the JSON shape in public/data/raw-metadata/case30.json and public/data/scenarios/*.json -- read the actual files to get the real field names right, don't guess.
+3. src/visualization: a 2D SVG network view component that renders the 30 buses as nodes and 41 lines as edges, using a force-directed or fixed layout (your choice, but make it readable -- 30 nodes need real layout thought, not a naive grid). Apply the DESIGN_SYSTEM.json palette (background #080D13, copper #EF9C54 for energized/normal flow, diagnostic blue #6FA9BE for shed/unserved state) and the chosen typeface for any labels. No interactivity yet -- just render the baseline fixture correctly: line thickness could reflect flow magnitude if the baseline fixture includes flow data (check oracle.py's solve() output shape), otherwise uniform thickness is fine for now.
+4. src/app state architecture: a single source-of-truth state shape (React context or a simple store, your call) that later tasks will extend with "currently removed bus" / "currently modified line capacity" / "current solve result" -- design this now so controls can plug in cleanly, but don't build any controls yet.
+5. One component test (Vitest + Testing Library) asserting the baseline fixture renders 30 bus elements and 41 line elements in the DOM/SVG.
+
+Do not build any of the 6 interactive controls yet -- that's the next tasks' job. Do not add motion/GSAP yet. Keep this to structure + static correct rendering of the baseline fixture.
+
+Run `npm run build && npm run test` yourself before finishing and fix anything that fails. Report back: files created, test result, and a one-line description of the layout approach you chose for the 30-node graph.

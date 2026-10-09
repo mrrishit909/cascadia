@@ -1,0 +1,13 @@
+Use the Agent tool to invoke the 'qa-engineer' subagent (.claude/agents/qa-engineer.md) with this task:
+
+You're in ~/cascadia. Read CLAUDE.md and ~/creative-engineering/docs/planning/cascadia/PROTOTYPE_ACCEPTANCE_CRITERIA.md's "Exact reset" and "Interruption safety" checklist items. Read the CAS-INT-001 and CAS-INT-005 controls and src/workers/lpWorker.ts built by prior tasks.
+
+Write two tests:
+
+1. **Exact reset** (Vitest component test): trigger CAS-INT-001's interaction (remove a bus), wait for the solve to resolve, then trigger reset. Assert the application state after reset is deep-equal to the state captured immediately after the initial baseline fixture load -- a structural/object comparison, not a screenshot diff or a visual check. Repeat for CAS-INT-005.
+
+2. **Interruption safety** (Vitest, directly exercising lpWorker.ts or an integration test through the UI, your choice): fire two rapid solve requests (e.g. remove bus A, then immediately remove bus B before A's solve could plausibly resolve). Assert the final displayed/stored result corresponds ONLY to the second request (B), never a stale result from A overwriting a newer state, and never both results racing into an inconsistent mixed state.
+
+Run `npm run build && npm run test` yourself and fix anything that fails. If you find a real bug (reset doesn't fully restore state, or a race condition where a stale result can win), fix it in the actual control/Worker code -- don't weaken the test to pass around the bug. If fixing it is beyond this task's scope, leave the test failing with a clear comment describing the bug, and report it explicitly rather than silently softening the assertion.
+
+Report back: test file paths, pass/fail for both, and if either failed, the exact bug found.

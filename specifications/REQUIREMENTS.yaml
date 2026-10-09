@@ -102,8 +102,9 @@ requirements:
     behavior: "Source/license review; schema; fixture checksum; reference calculator test."
     owner: "data-engineer + data-ai-engineer"
     verification: ["manual:dataset-verification skill output", "unit:oracle test suite"]
-    status: unstarted
-    evidence_paths: []
+    status: implemented
+    evidence_paths: ["specifications/DATA_CONTRACT.yaml", "research/tests/test_oracle.py", "public/data/provenance/manifest.json"]
+    note: "Schema/checksum/test-suite confirmed independently (15/15 pytest re-run by orchestrator). License review has one open TODO: the underlying UW/IEEE benchmark's own license text (not pandapower's, which is confirmed BSD-3) was not located, flagged honestly in DATA_CONTRACT.yaml rather than assumed. Not yet 'independently verified' pending that TODO."
   - id: CAS-MATH-001
     project: "CASCADIA"
     priority: P0
@@ -114,8 +115,9 @@ requirements:
     behavior: "Independent numerical baseline, boundary and infeasible-case agreement."
     owner: "data-ai-engineer, independently re-verified by qa-engineer"
     verification: ["unit:n1_parity_sweep", "unit:boundary_cases", "unit:infeasible_cases"]
-    status: unstarted
-    evidence_paths: []
+    status: in progress
+    evidence_paths: ["verification/REFERENCE_RESULTS/n1_sweep.json", "verification/REFERENCE_RESULTS/pandapower_crosscheck.json", "research/tests/test_oracle.py"]
+    note: "Python oracle side independently re-verified by orchestrator: 195/195 N-1 sweep cases pass invariants (re-counted directly from the JSON, not trusted from the subagent's report), max per-island balance error 2.8e-14 MW, pandapower cross-check agrees to 9.6e-13 MW max flow difference. This requirement's full scope also needs TS-Worker-vs-Python parity (not built yet, queued as execution/TASK_QUEUE.json task n1_parity_ts_vs_python) before it can move to 'tested'."
   - id: CAS-UX-001
     project: "CASCADIA"
     priority: P0
