@@ -167,8 +167,13 @@ input[type="range"] {
   outline-offset: 2px;
 }
 /* SVG network elements use a distinct focus treatment (networkFocusRing): warm white, not copper,
-   so it never reads as "energized" -- see networkEncoding.selectionOverlay in DESIGN_SYSTEM.json. */
-svg [role="button"]:focus-visible { outline: none; } /* ring drawn in-SVG, see NetworkView.tsx TODO */
+   so it never reads as "energized" -- see networkEncoding.selectionOverlay in DESIGN_SYSTEM.json.
+   A real in-SVG ring (2px #E8E4DC with a #080D13 gap stroke, per the token) is part of the
+   networkEncoding pass; this CSS outline is the interim keyboard-focus-visible fix so focus is
+   never invisible in the meantime (a prior version of this rule set outline:none here with a
+   "drawn in-SVG" comment, but no ring existed anywhere -- a real keyboard-parity regression, caught
+   before being independently reviewed). */
+svg [role="button"]:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
 [role="alert"] {
   color: var(--fault);
@@ -200,13 +205,18 @@ ul, ol {
 }
 li { margin-bottom: var(--sp-2); color: var(--text-secondary); }
 
+/* font-variation-settings is itself an inherited property on a variable font, so a descendant that
+   sets only font-weight (not font-variation-settings) does NOT override the ancestor's 'wght' axis --
+   font-weight alone is silently ignored once any ancestor has set font-variation-settings. Found
+   before this went to independent review: output/strong previously set font-weight:600 only and
+   rendered at body's inherited 'wght' 420 regardless. Token: numericMd (weight 560, stretch 75%). */
 output {
   font-variant-numeric: tabular-nums lining-nums;
   color: var(--text);
-  font-weight: 600;
+  font-variation-settings: 'wdth' 75, 'wght' 560;
 }
 
-strong { color: var(--text); font-weight: 600; }
+strong { color: var(--text); font-variation-settings: 'wdth' 75, 'wght' 560; }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }

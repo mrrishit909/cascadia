@@ -1,4 +1,5 @@
 // e2e coverage for CAS-INT-006 (compare restoration) against the real production build/Worker.
+import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 
 async function withWasmDelay(page: Page, ms: number) {
@@ -8,16 +9,17 @@ async function withWasmDelay(page: Page, ms: number) {
   });
 }
 
-// Reference values from verification/REFERENCE_RESULTS/add_line_restoration.json's restoration_cases,
-// derived from the Python oracle via research/evaluate/add_line_restoration.py's RESTORE dict -- pins
-// CompareRestoration.tsx's hardcoded PRESETS against the source of truth, so the two can't silently
-// drift apart.
-const REFERENCE = {
-  island_pocket_plus_line9: { n_orders: 6, best_order: "0, 1, 2", best_served: "554.60" },
-  bus_and_lines: { n_orders: 6, best_order: "0, 1, 2", best_served: "554.60" },
-  two_buses: { n_orders: 2, best_order: "1, 0", best_served: "343.00" },
-  k5_mixed: { n_orders: 120, best_order: "0, 3, 1, 2, 4", best_served: "910.60" },
-};
+// Read directly from verification/REFERENCE_RESULTS/add_line_restoration.json's restoration_cases
+// (derived from the Python oracle via research/evaluate/add_line_restoration.py's RESTORE dict) rather
+// than hardcoding the numbers here -- a hardcoded copy can't catch the reference file itself drifting
+// from a regenerated/changed Python RESTORE dict, only CompareRestoration.tsx's PRESETS drifting from
+// a frozen copy of the numbers (an independent review flagged this gap: "the pin isn't real").
+const refJson = JSON.parse(readFileSync(new URL("../verification/REFERENCE_RESULTS/add_line_restoration.json", import.meta.url), "utf8"));
+const REFERENCE: Record<string, { n_orders: number; best_order: string; best_served: string }> = {};
+for (const c of refJson.restoration_cases) {
+  const best = c.ranking[0];
+  REFERENCE[c.case_id] = { n_orders: c.ranking.length, best_order: best.order.join(", "), best_served: best.served_mw_steps.toFixed(2) };
+}
 
 for (const [label, ref] of Object.entries(REFERENCE)) {
   test(`pinned to the Python oracle: ${label} ranks ${ref.n_orders} orders, best is [${ref.best_order}] at ${ref.best_served}`, async ({ page }) => {
