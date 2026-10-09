@@ -31,7 +31,7 @@ requirements:
     verification: ["unit:n1_parity_sweep", "unit:load_gen_sweep", "e2e:newControls.spec.ts"]
     status: implemented
     evidence_paths: ["src/app/newControls.test.tsx", "tests/unit/loadGenParity.test.ts", "verification/REFERENCE_RESULTS/load_gen_sweep.json", "e2e/newControls.spec.ts"]
-    note: "39-case oracle sweep (7 forcing partial shed, not just the all-or-nothing total-load case) parity-verified against the TS Worker. A reintroduced N2-class bug (slider draft resynced on every unrelated control's pending change) found and fixed during this pass. Not yet independently reviewed."
+    note: "40-case oracle sweep (8 forcing partial shed, including one cross-control case with CAS-INT-005) parity-verified against the TS Worker. Two real bugs found and fixed: a reintroduced N2-class draft-resync bug, and a select-then-slider race (confirmed 30/30 reproducible, then 30/30 fixed) where an immediately-following slider edit could be silently reverted by the selection-change resync effect. D1/N1 ordering and allowShed-threading also directly verified (e2e/newControls.spec.ts). Not yet independently reviewed."
   - id: CAS-INT-003
     project: "CASCADIA"
     priority: P0
@@ -44,7 +44,7 @@ requirements:
     verification: ["unit:n1_parity_sweep", "unit:load_gen_sweep", "e2e:newControls.spec.ts"]
     status: implemented
     evidence_paths: ["src/app/newControls.test.tsx", "tests/unit/loadGenParity.test.ts", "verification/REFERENCE_RESULTS/load_gen_sweep.json", "e2e/newControls.spec.ts"]
-    note: "Same N2-class fix and sweep coverage as CAS-INT-002 (shared ReduceGenerator/IncreaseLoad draft-resync bug). Not yet independently reviewed."
+    note: "Same N2-class fix, select-slider race fix, and sweep coverage as CAS-INT-002 (shared ReduceGenerator/IncreaseLoad component pattern). Mutation-checked: reverting the race fix made its regression test fail 30/30 with no settle delay. Not yet independently reviewed."
   - id: CAS-INT-004
     project: "CASCADIA"
     priority: P0
@@ -94,7 +94,7 @@ requirements:
     verification: ["unit:island_balance", "e2e:newControls.spec.ts"]
     status: implemented
     evidence_paths: ["src/app/newControls.test.tsx", "e2e/newControls.spec.ts"]
-    note: "Covered by the D1/D2/N1/N2 e2e probes alongside CAS-INT-002/003 (shares runScen plumbing). Not yet independently reviewed."
+    note: "Covered by the D1/D2/N1/N2 e2e probes alongside CAS-INT-002/003 (shares runScen plumbing). A real focus-management bug found and fixed: Escape-to-cancel silently did nothing for a keyboard user because the confirm group's own button never received focus (browser dropped focus to <body> when 'Disable line' unmounted), so the section's onKeyDown handler never saw the event. Not yet independently reviewed."
 
   # --- Acceptance gates (source of truth: the Atlas's own executable contract table) ---
   - id: CAS-DATA-001
