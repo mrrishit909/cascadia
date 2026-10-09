@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useApp } from '../app/state'
 import { ScenarioReadout } from './ScenarioReadout'
 
@@ -9,6 +9,13 @@ export function LineOutage() {
   const { network, disabledLines, pending, solve, result } = state
   const [line, setLine] = useState<number | null>(null)
   const [confirming, setConfirming] = useState(false)
+  const confirmRef = useRef<HTMLButtonElement>(null)
+  // Without this, the "Disable line" button unmounts when confirming becomes true and the browser
+  // drops focus to <body> -- the section's own onKeyDown Escape handler only catches events bubbling
+  // from a DESCENDANT, so an event starting at <body> never reaches it, silently breaking the
+  // documented "Escape cancels" behavior for anyone who got here by keyboard (confirmed directly:
+  // document.activeElement read back as BODY after pressing Enter on "Disable line").
+  useEffect(() => { if (confirming) confirmRef.current?.focus() }, [confirming])
   if (!network) return null
   const off = (pending?.disabledLines ?? disabledLines)
   const out = line !== null && off.includes(line)
@@ -26,7 +33,7 @@ export function LineOutage() {
       {line !== null && confirming && (
         <div role="group" aria-label="Confirm outage">
           <p>Take line {line} out of service? It is removed from the topology.</p>
-          <button disabled={solve === 'solving'} onClick={() => { setConfirming(false); void setLineOutage(line, true) }}>Confirm outage</button>
+          <button ref={confirmRef} disabled={solve === 'solving'} onClick={() => { setConfirming(false); void setLineOutage(line, true) }}>Confirm outage</button>
           <button onClick={() => setConfirming(false)}>Cancel</button>
         </div>
       )}
