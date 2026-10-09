@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useReducer, useRef, type Dispatch, type ReactNode } from 'react'
-import type { CandidateLine, DcopfResult, ScenarioParams } from '../engine/dcopf'
+import type { CandidateLine, DcopfResult, DownElement, RestoreSeq, ScenarioParams } from '../engine/dcopf'
 import { createLpClient, SupersededError } from '../workers/lpClient'
 import type { Case30, Precomputed, Scenario } from '../engine/types'
 
@@ -66,6 +66,14 @@ export interface AppState {
   candidates: CandidateLine[] // CAS-INT-004 candidate lines, fetched once at init
   selectedLine: number | null
   pending: Scen | null // scenario intent of the in-flight solve, if any
+  // CAS-INT-006, lifted here (architecture-stabilization pass) so every mounted CompareRestoration
+  // instance -- its home chapter 5 AND chapter 6's laboratory -- shares one ranking result and one
+  // Worker, rather than each mount owning its own local state/client. Deliberately NOT part of Scen/
+  // the shared scenario machinery above: it's a standalone "what if" query over a hypothetical fault,
+  // not a mutation of removedBus/lineCapacity/etc, and it deliberately keeps its OWN solve/Worker
+  // lifecycle separate from the main one (see restorationRank below) -- a verified fix for a real bug
+  // where sharing the queue let a rank() query silently supersede-and-hang another control's solve.
+  restoration: { presetId: string; status: 'idle' | 'loading' | 'error'; error?: string; ranking?: RestoreSeq[]; chosen: number }
   // Bumped by 'reset'. lpClient's SupersededError only fires when a NEW solve()
   // call supersedes an OLDER one -- 'reset' dispatches straight to the reducer
   // and never calls solve(), so an already-in-flight Worker computation is not
@@ -86,8 +94,13 @@ export type Action =
   | { type: 'solving'; scenario: Scen }
   | { type: 'solveFailed'; error: string }
   | { type: 'reset' }
+  | { type: 'restorationPreset'; presetId: string }
+  | { type: 'restorationLoading' }
+  | { type: 'restorationDone'; ranking: RestoreSeq[] }
+  | { type: 'restorationError'; error: string }
+  | { type: 'restorationChoose'; index: number }
 
-const initial: AppState = { load: 'loading', removedBus: null, selectedBus: null, solve: 'idle', lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], addedLines: [], candidates: [], selectedLine: null, pending: null, epoch: 0 }
+const initial: AppState = { load: 'loading', removedBus: null, selectedBus: null, solve: 'idle', lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], addedLines: [], candidates: [], selectedLine: null, pending: null, epoch: 0, restoration: { presetId: '', status: 'idle', chosen: 0 } }
 
 function reducer(s: AppState, a: Action): AppState {
   switch (a.type) {
@@ -99,11 +112,16 @@ function reducer(s: AppState, a: Action): AppState {
     case 'solving': return { ...s, solve: 'solving', solveError: undefined, pending: a.scenario }
     case 'solveFailed': return { ...s, solve: 'error', solveError: a.error, pending: null }
     case 'reset': return { ...s, result: s.baseline, removedBus: null, lineCapacity: {}, allowShed: true, loadScale: {}, genPmax: {}, disabledLines: [], addedLines: [], selectedLine: null, selectedBus: null, solve: 'idle', solveError: undefined, pending: null, epoch: s.epoch + 1 }
+    case 'restorationPreset': return { ...s, restoration: { presetId: a.presetId, status: 'idle', chosen: 0 } }
+    case 'restorationLoading': return { ...s, restoration: { ...s.restoration, status: 'loading', error: undefined, ranking: undefined, chosen: 0 } }
+    case 'restorationDone': return { ...s, restoration: { ...s.restoration, status: 'idle', ranking: a.ranking, chosen: 0 } }
+    case 'restorationError': return { ...s, restoration: { ...s.restoration, status: 'error', error: a.error } }
+    case 'restorationChoose': return { ...s, restoration: { ...s.restoration, chosen: a.index } }
   }
 }
 
 export type Solver = (c: Case30, sc: ScenarioParams, cands?: CandidateLine[]) => Promise<DcopfResult>
-const Ctx = createContext<{ state: AppState; dispatch: Dispatch<Action>; removeBus: (bus: number) => Promise<void>; setCapacity: (line: number, factor: number, allowShed: boolean) => Promise<void>; setLoadScale: (bus: number, factor: number) => Promise<void>; setGenPmax: (gen: number, mw: number | null) => Promise<void>; setLineOutage: (line: number, out: boolean) => Promise<void>; setAddedLine: (pos: number, added: boolean) => Promise<void> } | null>(null)
+const Ctx = createContext<{ state: AppState; dispatch: Dispatch<Action>; removeBus: (bus: number) => Promise<void>; setCapacity: (line: number, factor: number, allowShed: boolean) => Promise<void>; setLoadScale: (bus: number, factor: number) => Promise<void>; setGenPmax: (gen: number, mw: number | null) => Promise<void>; setLineOutage: (line: number, out: boolean) => Promise<void>; setAddedLine: (pos: number, added: boolean) => Promise<void>; selectRestorationPreset: (presetId: string) => void; compareRestoration: (down: DownElement[]) => Promise<void>; chooseRestoration: (index: number) => void } | null>(null)
 
 // Real Worker, created lazily on first solve.
 function workerSolver(): Solver {
@@ -111,6 +129,17 @@ function workerSolver(): Solver {
   return (c, sc, cands) => {
     client ??= createLpClient(new Worker(new URL('../workers/lpWorker.ts', import.meta.url), { type: 'module' }) as never)
     return client.solve(c, sc, cands)
+  }
+}
+// CAS-INT-006's rank() client: a SEPARATE Worker from the main scenario one (see the AppState comment
+// on `restoration`), but still ONE PER AppProvider instance -- scoped like workerSolver() below, not a
+// module-level singleton, so tests that mount a fresh AppProvider get a fresh client instead of
+// leaking a Worker across mounts.
+function restorationSolver() {
+  let client: ReturnType<typeof createLpClient> | undefined
+  return () => {
+    client ??= createLpClient(new Worker(new URL('../workers/lpWorker.ts', import.meta.url), { type: 'module' }) as never)
+    return client
   }
 }
 export const useApp = () => {
@@ -237,5 +266,27 @@ export function AppProvider({ children, solver }: { children: ReactNode; solver?
   const setAddedLine = useCallback((pos: number, added: boolean) => runScen(p => ({
     ...p, addedLines: added ? [...new Set([...p.addedLines, pos])].sort((a, b) => a - b) : p.addedLines.filter(k => k !== pos),
   }), `add_line_${pos}`, `candidate line ${pos} ${added ? 'added' : 'removed'}`), [runScen])
-  return <Ctx.Provider value={{ state, dispatch, removeBus, setCapacity, setLoadScale, setGenPmax, setLineOutage, setAddedLine }}>{children}</Ctx.Provider>
+
+  // CAS-INT-006: see the AppState `restoration` comment and getRestorationClient above for why this
+  // is a separate Worker/state slice from the main scenario machinery.
+  const getRestorationClient = useMemo(() => restorationSolver(), [])
+  const restorationMounted = useRef(true)
+  useEffect(() => { restorationMounted.current = true; return () => { restorationMounted.current = false } }, [])
+  const selectRestorationPreset = useCallback((presetId: string) => dispatch({ type: 'restorationPreset', presetId }), [])
+  const chooseRestoration = useCallback((index: number) => dispatch({ type: 'restorationChoose', index }), [])
+  const compareRestoration = useCallback(async (down: DownElement[]) => {
+    if (!state.network) return
+    dispatch({ type: 'restorationLoading' })
+    try {
+      const ranking = await getRestorationClient().rank(state.network, down, {}, state.candidates)
+      if (!restorationMounted.current) return
+      dispatch({ type: 'restorationDone', ranking })
+    } catch (e) {
+      if (!restorationMounted.current) return
+      if (e instanceof SupersededError) return // superseded by a later compareRestoration() call
+      dispatch({ type: 'restorationError', error: e instanceof Error ? e.message : String(e) })
+    }
+  }, [state.network, state.candidates, getRestorationClient])
+
+  return <Ctx.Provider value={{ state, dispatch, removeBus, setCapacity, setLoadScale, setGenPmax, setLineOutage, setAddedLine, selectRestorationPreset, compareRestoration, chooseRestoration }}>{children}</Ctx.Provider>
 }
