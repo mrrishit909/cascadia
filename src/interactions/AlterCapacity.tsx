@@ -10,8 +10,16 @@ const DEBOUNCE_MS = 250
 // infeasible diagnostic (e.g. line 9 at 0.25x, public/data/scenarios/infeasible.json) through this control.
 export function AlterCapacity() {
   const { state, dispatch, setCapacity } = useApp()
-  const { network, result, baseline, selectedLine, lineCapacity, solve, solveError } = state
+  const { network, result, baseline, selectedLine, lineCapacity, pending, solve, solveError } = state
+  // N2 fix: prefer the in-flight scenario's capacity over the last-confirmed one when re-syncing the
+  // slider, so re-selecting a line whose change is still solving shows what's actually been requested,
+  // not a stale pre-change value that then silently becomes the base for the next edit.
+  const effectiveCapacity = pending?.lineCapacity ?? lineCapacity
+  const effectiveAllowShed = pending?.allowShed ?? state.allowShed
   const [factor, setFactor] = useState(1)
+  // Local draft, for immediate UI feedback rather than waiting out the 250ms debounce -- same reasoning
+  // as `factor`, and resynced on the exact same occasions (line change, reset, pending resolution) from
+  // effectiveAllowShed rather than from the last-confirmed value alone (N1/N2's same staleness class).
   const [allowShed, setAllowShed] = useState(true)
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
   // The debounce timer schedules its call 250ms in the future; if it captured
@@ -31,17 +39,37 @@ export function AlterCapacity() {
   // an in-progress slider draft back to the last-committed value, silently discarding the user's not-yet-
   // debounced capacity change. Same bug class as D1 (a confirmed/in-progress action overwritten by a
   // stale resync), reached through this effect instead of request construction.
+  const resync = (sel: number | null) => {
+    clearTimeout(timer.current)
+    setFactor(sel === null ? 1 : effectiveCapacity[sel] ?? 1)
+    setAllowShed(effectiveAllowShed)
+  }
   const wasAtBaseline = useRef(atBaseline)
   useEffect(() => {
     const justReset = atBaseline && !wasAtBaseline.current
     wasAtBaseline.current = atBaseline
-    if (justReset) { clearTimeout(timer.current); setFactor(selectedLine === null ? 1 : lineCapacity[selectedLine] ?? 1) }
+    if (justReset) resync(selectedLine)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [atBaseline])
-  useEffect(() => { clearTimeout(timer.current); setFactor(selectedLine === null ? 1 : lineCapacity[selectedLine] ?? 1) },
+  useEffect(() => resync(selectedLine),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [selectedLine])
-  useEffect(() => { if (atBaseline) setAllowShed(true) }, [atBaseline])
+  // Re-sync once OUR OWN pending solve lands, so the slider/checkbox don't keep showing a stale
+  // pre-solve draft after it resolves (N2's second half) -- but ONLY our own, and ONLY if the user
+  // hasn't since switched to a different line: resyncing on *any* pending resolution (e.g. an
+  // unrelated bus removal finishing, or a stale reply for a line the user already navigated away
+  // from) was clearing an in-progress LOCAL debounce timer or overwriting the new line's draft with
+  // the old line's resolved value. `awaitingOwnLine` is set to the line a debounced request was
+  // actually fired for (not scheduled for), and cleared whenever selectedLine changes.
+  const awaitingOwnLine = useRef<number | null>(null)
+  useEffect(() => { awaitingOwnLine.current = null }, [selectedLine])
+  useEffect(() => {
+    if (pending === null && awaitingOwnLine.current !== null && awaitingOwnLine.current === selectedLine) {
+      awaitingOwnLine.current = null
+      resync(selectedLine)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending])
   useEffect(() => () => clearTimeout(timer.current), [])
   if (!network || !result) return null
   const solving = solve === 'solving'
@@ -49,7 +77,13 @@ export function AlterCapacity() {
   const line = selectedLine === null ? null : network.lines[selectedLine]
   const fire = (f: number, shed: boolean) => {
     clearTimeout(timer.current)
-    if (selectedLine !== null) timer.current = setTimeout(() => { void setCapacityRef.current(selectedLine, f, shed) }, DEBOUNCE_MS)
+    if (selectedLine !== null) {
+      const line = selectedLine
+      timer.current = setTimeout(() => {
+        awaitingOwnLine.current = line
+        void setCapacityRef.current(line, f, shed)
+      }, DEBOUNCE_MS)
+    }
   }
   return (
     <section aria-labelledby="ac-h">
