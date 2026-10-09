@@ -124,7 +124,19 @@ function reducer(s: AppState, a: Action): AppState {
     case 'loaded': return { ...s, load: 'ready', scenario: a.scenario, network: a.network, result: a.result, baseline: a.result, candidates: a.candidates }
     case 'failed': return { ...s, load: 'error', error: a.error }
     case 'solved': return { ...s, result: a.result, removedBus: a.scenario.removedBus, lineCapacity: a.scenario.lineCapacity, allowShed: a.scenario.allowShed, loadScale: a.scenario.loadScale, genPmax: a.scenario.genPmax, disabledLines: a.scenario.disabledLines, addedLines: a.scenario.addedLines, pending: null, selectedBus: null, solve: 'idle', solveError: undefined }
-    case 'selectLine': return { ...s, selectedLine: a.line }
+    case 'selectLine': {
+      // Architecture-stabilization fix: capDraft resync used to be a per-component effect keyed on
+      // selectedLine. With AlterCapacity mounted twice (home chapter 3 + lab), every mounted instance
+      // ran its OWN copy of that effect -- harmless when they'd compute the same value, but a problem
+      // on (re)mount: a newly-mounted instance's mount-time resync could fire with the last-confirmed
+      // value and clobber a draft the user was actively editing in the OTHER already-mounted instance,
+      // since both ultimately write the same shared capDraft. Doing it here, once, atomically, as part
+      // of the selection change itself, removes that whole class of remount-driven overwrite -- there
+      // is no per-instance effect left to double-fire or fire late on mount.
+      const effCap = s.pending?.lineCapacity ?? s.lineCapacity
+      const effShed = s.pending?.allowShed ?? s.allowShed
+      return { ...s, selectedLine: a.line, capDraft: { factor: a.line === null ? 1 : effCap[a.line] ?? 1, allowShed: effShed } }
+    }
     case 'select': return { ...s, selectedBus: a.bus }
     case 'solving': return { ...s, solve: 'solving', solveError: undefined, pending: a.scenario }
     case 'solveFailed': return { ...s, solve: 'error', solveError: a.error, pending: null }

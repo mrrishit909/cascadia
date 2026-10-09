@@ -9,6 +9,8 @@ import { solveDcopf } from '../engine/dcopf'
 import { AppProvider } from './state'
 import { IncreaseLoad } from '../interactions/IncreaseLoad'
 import { ReduceGenerator } from '../interactions/ReduceGenerator'
+import { AlterCapacity } from '../interactions/AlterCapacity'
+import { LineOutage } from '../interactions/LineOutage'
 // CompareRestoration's dual-mount Worker-count proof lives in e2e/dualMount.spec.ts instead of here:
 // jsdom (this file's environment) has no real Worker constructor to intercept/count, and that proof
 // is only meaningful against the real browser runtime anyway.
@@ -22,8 +24,9 @@ const stubFetch = () => vi.stubGlobal('fetch', async (url: string) => ({
 async function setup(children: React.ReactNode, waitForText: string) {
   stubFetch()
   const highs = await highsLoader()
-  render(<AppProvider solver={async (c, sc, cands) => solveDcopf(c, highs, sc, cands)}>{children}</AppProvider>)
+  const utils = render(<AppProvider solver={async (c, sc, cands) => solveDcopf(c, highs, sc, cands)}>{children}</AppProvider>)
   await screen.findAllByText(waitForText)
+  return utils
 }
 
 describe('dual mount: IncreaseLoad (draft lifted to AppState.loadDraft)', () => {
@@ -59,5 +62,49 @@ describe('dual mount: ReduceGenerator (draft lifted to AppState.genDraft)', () =
     await waitFor(() => expect((lab.getByLabelText('Generator') as HTMLSelectElement).value).toBe('0'))
     fireEvent.change(home.getByLabelText('Pmax'), { target: { value: '10' } })
     await waitFor(() => expect(lab.getByTestId('gen-pmax')).toHaveTextContent('10 MW'))
+  })
+})
+
+describe('dual mount: AlterCapacity (draft lifted to AppState.capDraft, selectLine resync moved into the reducer)', () => {
+  it('selecting a line and dragging the capacity slider in instance A shows identically in instance B', async () => {
+    await setup(<><div data-testid="home"><AlterCapacity /></div><div data-testid="lab"><AlterCapacity /></div></>, "Alter line capacity")
+    const home = within(screen.getByTestId('home'))
+    const lab = within(screen.getByTestId('lab'))
+    fireEvent.change(home.getByLabelText('Line'), { target: { value: '9' } })
+    await waitFor(() => expect((lab.getByLabelText('Line') as HTMLSelectElement).value).toBe('9'))
+    fireEvent.change(home.getByRole('slider'), { target: { value: '0.5' } })
+    await waitFor(() => expect(lab.getByTestId('cap-factor')).toHaveTextContent('0.50x'))
+  })
+
+  it('REGRESSION: remounting instance B does not clobber an uncommitted draft the user is editing in instance A', async () => {
+    // This is the exact bug class the selectLine-resync-into-the-reducer fix closes: a newly (re)mounted
+    // instance's old per-component mount-time resync effect would fire with the LAST-CONFIRMED value and
+    // overwrite the shared capDraft, discarding whatever uncommitted edit instance A had in progress.
+    const { rerender } = await setup(<div data-testid="home"><AlterCapacity /></div>, "Alter line capacity")
+    const home = within(screen.getByTestId('home'))
+    fireEvent.change(home.getByLabelText('Line'), { target: { value: '9' } })
+    fireEvent.change(home.getByRole('slider'), { target: { value: '0.42' } }) // uncommitted draft, no Apply/debounce fired yet
+    await waitFor(() => expect(home.getByTestId('cap-factor')).toHaveTextContent('0.42x'))
+    const highs = await highsLoader()
+    rerender(
+      <AppProvider solver={async (c, sc, cands) => solveDcopf(c, highs, sc, cands)}>
+        <div data-testid="home"><AlterCapacity /></div>
+        <div data-testid="lab"><AlterCapacity /></div>
+      </AppProvider>,
+    )
+    // instance B mounts fresh (its own mount-time machinery runs) -- A's draft must survive untouched
+    expect(home.getByTestId('cap-factor')).toHaveTextContent('0.42x')
+    const lab = within(screen.getByTestId('lab'))
+    expect(lab.getByTestId('cap-factor')).toHaveTextContent('0.42x')
+  })
+})
+
+describe('dual mount: LineOutage (selection lifted to AppState.outageLine)', () => {
+  it('selecting a line in instance A shows identically in instance B', async () => {
+    await setup(<><div data-testid="home"><LineOutage /></div><div data-testid="lab"><LineOutage /></div></>, "Line outage")
+    const home = within(screen.getByTestId('home'))
+    const lab = within(screen.getByTestId('lab'))
+    fireEvent.change(home.getByLabelText('Line to disable'), { target: { value: '0' } })
+    await waitFor(() => expect((lab.getByLabelText('Line to disable') as HTMLSelectElement).value).toBe('0'))
   })
 })

@@ -17,12 +17,7 @@ const DEBOUNCE_MS = 250
 // display the same thing regardless of which one is doing the firing).
 export function AlterCapacity() {
   const { state, dispatch, setCapacity } = useApp()
-  const { network, result, baseline, selectedLine, lineCapacity, pending, solve, solveError, capDraft } = state
-  // N2 fix: prefer the in-flight scenario's capacity over the last-confirmed one when re-syncing the
-  // slider, so re-selecting a line whose change is still solving shows what's actually been requested,
-  // not a stale pre-change value that then silently becomes the base for the next edit.
-  const effectiveCapacity = pending?.lineCapacity ?? lineCapacity
-  const effectiveAllowShed = pending?.allowShed ?? state.allowShed
+  const { network, result, selectedLine, pending, solve, solveError, capDraft, epoch } = state
   const { factor, allowShed } = capDraft
   const headingId = useId()
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -36,27 +31,15 @@ export function AlterCapacity() {
   // pending/confirmed scenario via base().
   const setCapacityRef = useRef(setCapacity)
   useEffect(() => { setCapacityRef.current = setCapacity }, [setCapacity])
-  const atBaseline = result === baseline
-  // Re-sync the draft on line change or on an actual reset (baseline newly true) only -- NOT on every
-  // atBaseline toggle. atBaseline also flips false->true->false from OTHER controls' unrelated solves
-  // (e.g. a bus removal moving `result` away from `baseline`); resyncing on that edge too was clobbering
-  // an in-progress slider draft back to the last-committed value, silently discarding the user's not-yet-
-  // debounced capacity change. Same bug class as D1 (a confirmed/in-progress action overwritten by a
-  // stale resync), reached through this effect instead of request construction.
-  const resync = (sel: number | null) => {
-    clearTimeout(timer.current)
-    dispatch({ type: 'setCapDraft', factor: sel === null ? 1 : effectiveCapacity[sel] ?? 1, allowShed: effectiveAllowShed })
-  }
-  const wasAtBaseline = useRef(atBaseline)
-  useEffect(() => {
-    const justReset = atBaseline && !wasAtBaseline.current
-    wasAtBaseline.current = atBaseline
-    if (justReset) resync(selectedLine)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [atBaseline])
-  useEffect(() => resync(selectedLine),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedLine])
+  // Architecture-stabilization fix: the draft resync on line-change/reset used to be TWO per-component
+  // effects here (one keyed on `selectedLine`, one on `atBaseline`). With this control mounted twice
+  // (home chapter 3 + lab), each mounted instance ran its OWN copy -- harmless when both computed the
+  // same value, but a real bug on (re)mount: a newly (re)mounted instance's effect fires with the
+  // last-confirmed value and can clobber a draft the user is actively editing in the OTHER instance,
+  // since both write the same shared capDraft. Moved into the `selectLine` reducer case instead (one
+  // atomic update, no per-instance effect to double-fire or fire late on mount); `reset` already resets
+  // capDraft directly in the reducer. Only the local debounce timer needs clearing here, on both edges.
+  useEffect(() => { clearTimeout(timer.current) }, [selectedLine, epoch])
   // Re-sync once OUR OWN pending solve lands, so the slider/checkbox don't keep showing a stale
   // pre-solve draft after it resolves (N2's second half) -- but ONLY our own, and ONLY if the user
   // hasn't since switched to a different line: resyncing on *any* pending resolution (e.g. an
@@ -64,12 +47,19 @@ export function AlterCapacity() {
   // from) was clearing an in-progress LOCAL debounce timer or overwriting the new line's draft with
   // the old line's resolved value. `awaitingOwnLine` is set to the line a debounced request was
   // actually fired for (not scheduled for), and cleared whenever selectedLine changes.
+  //
+  // Residual, accepted risk (documented, not silently ignored): if a SECOND mounted instance has its
+  // OWN uncommitted draft for a DIFFERENT, not-yet-sent edit to the same line when THIS instance's
+  // pending solve resolves, this resync still overwrites the shared capDraft with the now-stale
+  // resolved value, clobbering that other draft. Fully solving concurrent cross-instance editing of
+  // the exact same field within the same ~250ms window is out of scope for this pass; the far more
+  // common trigger (a (re)mount's OWN effect firing stale) is what the reducer fix above closes.
   const awaitingOwnLine = useRef<number | null>(null)
   useEffect(() => { awaitingOwnLine.current = null }, [selectedLine])
   useEffect(() => {
     if (pending === null && awaitingOwnLine.current !== null && awaitingOwnLine.current === selectedLine) {
       awaitingOwnLine.current = null
-      resync(selectedLine)
+      dispatch({ type: 'selectLine', line: selectedLine }) // re-reads capDraft from the now-confirmed state
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pending])
