@@ -62,6 +62,7 @@ it('interruption: bus A then bus B; A reply arrives last yet only B is stored/di
   const worker: WorkerLike = {
     onmessage: null,
     postMessage(m: LpRequest) {
+      if (m.kind === 'rank') throw new Error('unexpected rank request in this test')
       const result = solveDcopf(m.case, highs, m.scenario)
       held.push(() => worker.onmessage?.({ data: { id: m.id, ok: true, result } }))
     },
@@ -87,6 +88,7 @@ it('interruption: A reply arriving before B is submitted-complete is dropped, no
   const worker: WorkerLike = {
     onmessage: null,
     postMessage(m: LpRequest) {
+      if (m.kind === 'rank') throw new Error('unexpected rank request in this test')
       const result = solveDcopf(m.case, highs, m.scenario)
       held.push(() => worker.onmessage?.({ data: { id: m.id, ok: true, result } }))
     },

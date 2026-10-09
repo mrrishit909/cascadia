@@ -20,7 +20,10 @@ export function Scene() {
         alteredLines={Object.keys(state.lineCapacity).map(Number)} disabledLines={state.disabledLines}
         onRestoreLine={line => void setLineOutage(line, false)}
         candidates={state.candidates} addedLines={state.addedLines}
-        onToggleCandidate={pos => void setAddedLine(pos, !state.addedLines.includes(pos))} />
+        // pending-aware, not just confirmed state.addedLines: a second click while this exact add/remove
+        // is still in flight must continue the SAME direction, not flip it (matches AddLine.tsx's own
+        // `eff` computation) -- found by advisor review, confirmed reachable via rapid SVG double-click.
+        onToggleCandidate={pos => { const eff = state.pending?.addedLines ?? state.addedLines; void setAddedLine(pos, !eff.includes(pos)) }} />
       <RemoveNode />
       <AlterCapacity />
       <IncreaseLoad />

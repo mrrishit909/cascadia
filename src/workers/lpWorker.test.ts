@@ -27,6 +27,7 @@ describe('cancellation', () => {
     const worker: WorkerLike = {
       onmessage: null,
       postMessage(m: LpRequest) { // fake worker: replies in the same order, asynchronously
+        if (m.kind === 'rank') throw new Error('unexpected rank request in this test')
         const result = solveDcopf(m.case, highs, m.scenario)
         setTimeout(() => worker.onmessage?.({ data: { id: m.id, ok: true, result } }), 0)
       },
