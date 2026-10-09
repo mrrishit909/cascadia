@@ -15,7 +15,7 @@
       "id": "highs_worker_setup",
       "description": "Install highs (MIT, WASM) and build a Worker wrapper with a smoke test",
       "depends_on": [],
-      "status": "pending",
+      "status": "done",
       "prompt_file": "highs_worker_setup.txt",
       "test_cmd": "npm run build && npm run test"
     },
