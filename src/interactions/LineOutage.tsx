@@ -18,7 +18,21 @@ export function LineOutage() {
   // document.activeElement read back as BODY after pressing Enter on "Disable line"). Covers both
   // directions: entering confirm (focus "Confirm outage") and leaving it via Cancel/Escape (focus
   // "Disable line"/"Restore line" again), not just the first one found.
-  useEffect(() => { (confirming ? confirmRef : triggerRef).current?.focus() }, [confirming])
+  //
+  // Confirm's own click handler both leaves `confirming` and starts a solve in the same batch, so the
+  // trigger button re-renders DISABLED (solve === 'solving') at the exact moment this effect would
+  // focus it -- .focus() on a disabled element is a silent no-op, so focus dropped to <body> again,
+  // the same bug reached a second way. Deferred via `awaitingTriggerFocus`: if the trigger isn't
+  // focusable yet, wait for solve to leave 'solving' and focus it then instead.
+  const awaitingTriggerFocus = useRef(false)
+  useEffect(() => {
+    if (confirming) { confirmRef.current?.focus(); return }
+    if (triggerRef.current && !triggerRef.current.disabled) triggerRef.current.focus()
+    else awaitingTriggerFocus.current = true
+  }, [confirming])
+  useEffect(() => {
+    if (solve !== 'solving' && awaitingTriggerFocus.current) { awaitingTriggerFocus.current = false; triggerRef.current?.focus() }
+  }, [solve])
   if (!network) return null
   const off = (pending?.disabledLines ?? disabledLines)
   const out = line !== null && off.includes(line)

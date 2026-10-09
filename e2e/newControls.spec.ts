@@ -42,14 +42,28 @@ test("regression: generator Pmax reductions survive a rapid select+slider loop u
   //
   // A simpler single-generator version of this test (select once, set once, Apply once) was found by
   // an advisor review to pass even on the pre-fix code -- it never actually exercised the race. This
-  // version was verified BOTH ways before being kept: run against the pre-fix component with real
-  // keyboard input (focus + Home, never .fill()), it failed 3/10 times (genuinely racy, not
-  // deterministic at this granularity, but real); against the fixed component, 20/20 passed. The
-  // single generator case alone doesn't reproduce it reliably -- the checkbox's own debounced solve
-  // (AlterCapacity) running concurrently during the loop is what reliably perturbs the timing enough
-  // to hit the window, which is why this test keeps that checkbox interaction rather than dropping it
-  // as unrelated setup.
+  // version, with the .provenance watch below (added after a second review found the final-infeasible
+  // check alone could still pass with one reduction silently lost), was verified BOTH ways: run against
+  // the pre-fix component with real keyboard input (focus + Home, never .fill()), 20/20 repeat-each
+  // runs FAILED (the .provenance watch caught "Pmax rated" every time); against the fixed component,
+  // 20/20 passed. An earlier looser probe using just the final "n/a (infeasible)" check (no .provenance
+  // watch) only failed 3/10 times against pre-fix code with this same real-keyboard shape -- consistent
+  // with losing a single reduction usually still reading as infeasible, which is exactly why that
+  // weaker check was replaced. The checkbox's own debounced solve (AlterCapacity) running concurrently
+  // during the loop is what perturbs the timing enough to hit the window at all; the single-generator
+  // case (no checkbox) didn't reproduce it, which is why this test keeps that interaction.
   await page.goto("/");
+  await page.waitForSelector(".provenance");
+  // "n/a (infeasible)" alone is a weak final assertion: gens 0/1/2/3 total 265 MW against a 189.2 MW
+  // load, so losing any ONE of the four reductions still leaves well under 189.2 MW of capacity and
+  // still reads as infeasible -- the test could pass with a reduction silently lost. Watch .provenance
+  // directly instead and fail on ANY entry showing "Pmax rated" (the smoking-gun string Apply submits
+  // when the slider value was reverted before the click).
+  await page.evaluate(() => {
+    (window as unknown as { __prov: string[] }).__prov = []
+    const target = document.querySelector('.provenance') as Element
+    new MutationObserver(() => (window as unknown as { __prov: string[] }).__prov.push(target.textContent ?? '')).observe(target, { characterData: true, childList: true, subtree: true })
+  });
   await page.locator('section:has-text("Alter line capacity") select').selectOption({ index: 1 });
   const cb = page.getByRole("checkbox", { name: "Allow load shedding" });
   await cb.focus();
@@ -63,6 +77,8 @@ test("regression: generator Pmax reductions survive a rapid select+slider loop u
     await page.getByRole("button", { name: "Apply limit" }).click();
   }
   await expect(page.getByTestId("gen-unserved")).toHaveText("n/a (infeasible)", { timeout: 5000 });
+  const prov = await page.evaluate(() => (window as unknown as { __prov: string[] }).__prov);
+  expect(prov.some((p) => p.includes('Pmax rated'))).toBe(false);
 });
 
 test("N1/D2 for line outage: disabling line 33 with 'Allow load shedding' off shows n/a (infeasible)", async ({ page }) => {
@@ -116,16 +132,19 @@ test("N1: increasing load respects 'Allow load shedding' off, not the engine def
   await expect(page.locator(".provenance")).toContainText("load x10, shedding disabled");
 });
 
-test("D1: load applied while AlterCapacity's debounced capacity solve is genuinely in flight: both land, solver-confirmed", async ({ page }) => {
+test("D1: AlterCapacity's debounced request fires while the load solve is genuinely in flight: both land, solver-confirmed", async ({ page }) => {
   // Every Apply/Confirm button in this app disables itself during solve, so a race can't be driven
   // through a second button click (Playwright's .click() waits for enabled) -- the real D1-class race
   // surviving in production is AlterCapacity's 250ms DEBOUNCE window: a capacity change is confirmed
-  // (not yet dispatched to the Worker) and a second control's Apply fires inside that window, so the
-  // debounced setCapacity call ends up racing the load solve instead of being serialized behind it.
-  // A WASM load delay widens the window deterministically, rather than relying on exact keystroke
-  // timing landing the debounce after the load solve starts (confirmed by direct measurement without
-  // a delay that this ordering already happens 5/5 times at this test's keystroke count, but the delay
-  // removes any dependency on that being stable across machines/CI).
+  // (armed, not yet dispatched to the Worker), then Apply load fires the page's first actual solve()
+  // call, which the WASM delay below stretches to ~1500ms. The capacity debounce timer elapses DURING
+  // that window and dispatches its own request to the same Worker while the load solve is still in
+  // flight -- the request ordering is the reverse of what an earlier version of this test's name
+  // implied (it is NOT the capacity solve that's in flight when load applies; it's the other way
+  // round). Confirmed by direct measurement (a .provenance MutationObserver, 5/5 runs): the load
+  // result lands first, the capacity result lands second, even with no WASM delay at this test's exact
+  // keystroke count -- the delay below just makes that ordering deterministic across machines/CI
+  // rather than depending on keystroke timing.
   await withWasmDelay(page, 1500);
   await page.goto("/");
   await page.locator('section:has-text("Alter line capacity") select').selectOption({ index: 10 }); // line 9
@@ -227,6 +246,22 @@ test("keyboard-only parity (buttons/Escape): Line outage works end to end withou
   await expect(page.getByRole("button", { name: "Confirm outage" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("outage-list")).toHaveText("0", { timeout: 3000 });
+});
+
+test("regression: focus returns to 'Restore line' after Confirm outage's solve settles, not dropped to body", async ({ page }) => {
+  // Confirm's click handler leaves `confirming` and starts a solve in the same batch, so the trigger
+  // button re-renders disabled at the exact moment the naive version of this fix tried to focus it --
+  // .focus() on a disabled element is a silent no-op. Add a real WASM delay so there's a window where
+  // the trigger is genuinely disabled to prove the deferred-focus path (awaitingTriggerFocus), not just
+  // the already-enabled case covered by the test above.
+  await withWasmDelay(page, 1500);
+  await page.goto("/");
+  await page.locator('section:has-text("Line outage") select').selectOption({ index: 1 });
+  await page.getByRole("button", { name: "Disable line" }).focus();
+  await page.keyboard.press("Enter");
+  await page.getByRole("button", { name: "Confirm outage" }).focus();
+  await page.keyboard.press("Enter"); // solve in flight (~1.5s); trigger button re-renders disabled now
+  await expect(page.getByRole("button", { name: "Restore line" })).toBeFocused({ timeout: 3000 });
 });
 
 test("reset during an active generator solve restores Pmax to rated", async ({ page }) => {
