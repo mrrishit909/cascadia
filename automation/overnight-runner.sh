@@ -5,6 +5,13 @@
 # its own schedule. This script never loops/sleeps internally.
 set -uo pipefail
 
+# launchd (and a plain `bash script.sh` invocation) does not source
+# .zshrc/.bash_profile, so PATH is minimal and won't include ~/.local/bin
+# (where `claude` lives) or Homebrew. Set it explicitly rather than assume
+# an interactive shell's PATH -- this exact gap is what the mandatory trial
+# run (Phase 13) caught: claude -p exited 127 (command not found) without it.
+export PATH="/usr/local/bin:/opt/homebrew/bin:$HOME/.local/bin:$HOME/.nvm/versions/node/v24.21.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+
 REPO="$HOME/cascadia"
 cd "$REPO" || { echo "FATAL: cannot cd to $REPO" >&2; exit 1; }
 
