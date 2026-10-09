@@ -67,16 +67,42 @@ a story fixture (per section 1 above) AND a live control that mutates real `AppS
 diverge: the story fixture shows a specific curated post-fault state; the user's own live interaction
 in that chapter's control can produce a *different* result.
 
-**Resolution:** the stage shows the chapter's story fixture **until the live scenario's confirmed state
-diverges from baseline** (i.e. `result !== baseline` in `AppState` terms -- the same check
-`AlterCapacity.tsx` already uses for its own resync logic), **at which point it shows the live result
-instead**, labeled distinctly (e.g. a small "YOUR SCENARIO" tag near the legend plate, replacing
-whatever story-fixture label was showing). Reset returns to the story fixture, not literally "baseline"
-if the chapter's story fixture isn't the unmodified baseline.
+**Original resolution (superseded below, kept for history):** "the stage shows the chapter's story
+fixture until `result !== baseline`, then shows the live result." Advisor review found this broken on
+three counts before any chapter code existed:
+- (a) `!==` is reference identity on a `DcopfResult` object. Apply a change, then apply the exact
+  inverse (e.g. drag a capacity slider back to 1.00x and let it resolve), and the new solve produces a
+  structurally-identical-but-freshly-allocated result object -- `!==` stays true forever, so the stage
+  would stick on "YOUR SCENARIO" even though the scenario is back at baseline. The check needs to be a
+  **value comparison against the chapter's own relevant fields**, not object identity.
+- (b) The check was written against `AppState` globally, so it fires for ANY chapter once ANY one of
+  them diverges -- editing chapter 3's capacity slider would also flip chapter 2's and chapter 4's
+  stages to "YOUR SCENARIO" the next time the user scrolls past them, even though the user never
+  touched those chapters' own controls.
+- (c) Each chapter's control writes different fields, so "diverged" has to be chapter-scoped: chapter 2
+  (CAS-INT-002/003) cares about `loadScale`/`genPmax`; chapter 3 (CAS-INT-005) cares about
+  `lineCapacity`/`allowShed`; chapter 4 (CAS-INT-001/007) cares about `removedBus`/`disabledLines`.
+  Chapter 5 (CAS-INT-006) is a different subsystem entirely (`AppState.restoration`, its own Worker) --
+  its divergence condition is simply "has the user run at least one Compare" (`restoration.ranking !==
+  null`), not a comparison against the main scenario's baseline at all.
 
-This keeps the rule from section 1 intact (the fixture transition itself is still not live-solved) while
-making a user's own action visibly take effect immediately, not get silently overridden by the next
-scroll-triggered fixture swap.
+**Actual resolution:** each chapter's divergence check is a **named, chapter-scoped predicate** over
+only the fields that chapter's own control(s) can write, comparing against `state.baseline`'s value for
+those same fields (plain value equality on numbers/booleans/sorted-array-contents, never object
+identity):
+- Chapter 2: `state.loadScale !== baseline.loadScale (per-bus) || state.genPmax !== baseline.genPmax (per-gen)`
+- Chapter 3: `state.lineCapacity` has any key whose factor differs from 1, or `allowShed` differs from
+  its default
+- Chapter 4: `state.removedBus !== null || state.disabledLines.length > 0`
+- Chapter 5: `state.restoration.ranking !== null`
+
+Each chapter shows ITS OWN story fixture until ITS OWN predicate is true, independent of every other
+chapter's state -- diverging chapter 3 never touches chapter 2's or chapter 4's displayed stage. Once a
+chapter's predicate is true, that chapter's stage shows the live result, labeled "YOUR SCENARIO"; once
+the predicate becomes false again (user reset, or reversed their own edit back to baseline), the stage
+returns to the story fixture and the label reverts. This keeps the rule from section 1 intact (the
+fixture transition itself is still not live-solved) while making a user's own action visibly take
+effect immediately, scoped to the chapter that actually owns it.
 
 ## 4. Chapter table (from `docs/ART_DIRECTION.md`, repeated here for a single reference point)
 

@@ -47,7 +47,11 @@ private Worker -- a second mount would show stale/diverging data or load WASM tw
   documented inline.
 - Dual-mount proof tests added: `src/app/dualMount.test.tsx` (vitest/RTL, real Worker via highsLoader,
   proves two mounted instances of IncreaseLoad/ReduceGenerator share state both directions) and
-  `e2e/dualMount.spec.ts` (real browser, proves the restoration Worker is a true singleton).
+  `e2e/dualMount.spec.ts` (real browser, proves at most one restoration Worker is ever constructed
+  across repeated Compare clicks with different presets -- NOT yet a true two-DOM-instance proof: the
+  app doesn't dual-mount any control until chapter scaffolding exists, so this only exercises the one
+  existing mount repeatedly; honestly scoped in the test's own header comment, revisit once a chapter
+  actually renders a control twice).
 - `docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` (new): resolves the real contradiction between
   "one persistent SVG stage" and chapter 3's locator inset / chapter 5's 3 mini networks (resolution:
   the stage is the one canonical INTERACTIVE NetworkView; insets/minis are a non-interactive render
