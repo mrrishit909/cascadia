@@ -26,7 +26,7 @@
         "frontend_scene_skeleton",
         "highs_worker_setup"
       ],
-      "status": "pending",
+      "status": "done",
       "prompt_file": "cas_int_001_control.txt",
       "test_cmd": "npm run build && npm run test"
     },

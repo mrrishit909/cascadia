@@ -16,7 +16,7 @@ requirements:
     behavior: "Remove node"
     owner: "data-ai-engineer (oracle) + frontend-engineer (control)"
     verification: ["unit:island_balance", "unit:n1_parity_sweep", "e2e:cas_substation_remove_keyboard"]
-    status: unstarted
+    status: implemented
     evidence_paths: []
   - id: CAS-INT-002
     project: "CASCADIA"

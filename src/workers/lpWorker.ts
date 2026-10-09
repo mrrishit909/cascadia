@@ -2,7 +2,7 @@
 // Web Worker: loads HiGHS WASM once, solves scenarios posted as {id, case, scenario}.
 // Every reply echoes the request id; lpClient drops replies that are not the latest.
 import highsLoader from 'highs'
-import wasmUrl from 'highs/build/highs.wasm?url'
+import wasmUrl from 'highs/runtime?url'
 import { solveDcopf, type DcopfResult, type ScenarioParams } from '../engine/dcopf'
 import type { Case30 } from '../engine/types'
 
