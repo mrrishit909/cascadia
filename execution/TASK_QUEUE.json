@@ -93,7 +93,7 @@
         "reset_interruption_tests",
         "no_fake_numbers_audit"
       ],
-      "status": "pending",
+      "status": "done",
       "prompt_file": "prototype_acceptance_report.txt",
       "test_cmd": ""
     }
