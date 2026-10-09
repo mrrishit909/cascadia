@@ -33,11 +33,14 @@ export function RemoveNode() {
       {solving && <p role="status">Solving island-aware DC-OPF in Worker...</p>}
       {solve === 'error' && <p role="alert">Solve failed: {solveError}</p>}
       {r.status === 'infeasible' && <p role="alert">Infeasible: {r.diagnostics.join('; ') || 'no feasible dispatch'}</p>}
+      {/* Infeasible means no valid dispatch exists at all -- showing "0.00 MW" here would read as
+          "fully served", not "undefined". n/a is deliberately not a number. Found by the
+          no_fake_numbers_audit task's adversarial review (verification/NO_FAKE_NUMBERS_AUDIT.md #6). */}
       <p role="status" aria-live="polite">
         {removedBus !== null && <>Bus {network.buses[removedBus].name} unavailable. </>}
-        Unserved: <strong data-testid="unserved-mw">{mw(r.total_unserved_mw)}</strong>
+        Unserved: <strong data-testid="unserved-mw">{r.status === 'infeasible' ? 'n/a (infeasible)' : mw(r.total_unserved_mw)}</strong>
       </p>
-      {r.shed_no_generation_mw !== undefined && (
+      {r.status !== 'infeasible' && r.shed_no_generation_mw !== undefined && (
         <ul>
           <li data-testid="unserved-removed">Load at removed bus: {mw(r.unserved_removed_mw ?? 0)}</li>
           <li data-testid="shed-no-generation">Shed, island has no generation: {mw(r.shed_no_generation_mw)}</li>

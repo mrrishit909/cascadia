@@ -53,10 +53,19 @@ export function AlterCapacity() {
       {solving && <p role="status">Solving DC-OPF in Worker...</p>}
       {solve === 'error' && <p role="alert">Solve failed: {solveError}</p>}
       {r.status === 'infeasible' && <p role="alert">Infeasible: {r.diagnostics.join('; ') || 'no feasible dispatch'}</p>}
+      {/* Infeasible means no valid dispatch exists; "0.00 MW" would read as "fully served". n/a is
+          deliberately not a number. Found by no_fake_numbers_audit's adversarial review
+          (verification/NO_FAKE_NUMBERS_AUDIT.md #6). */}
       <p role="status" aria-live="polite">
-        Binding lines: <strong data-testid="binding-lines">{r.binding_lines.length ? r.binding_lines.join(', ') : 'none'}</strong>
-        {' '}| Unserved: <strong data-testid="cap-unserved">{r.total_unserved_mw.toFixed(2)} MW</strong>
-        {line && <> | Line {line.idx} flow: <span data-testid="cap-flow">{Math.abs(r.flows[line.idx] ?? 0).toFixed(2)} MW</span></>}
+        {r.status === 'infeasible' ? (
+          <>Binding lines: <strong data-testid="binding-lines">n/a (infeasible)</strong>
+          {' '}| Unserved: <strong data-testid="cap-unserved">n/a (infeasible)</strong></>
+        ) : (
+          <>Binding lines: <strong data-testid="binding-lines">{r.binding_lines.length ? r.binding_lines.join(', ') : 'none'}</strong>
+          {' '}| Unserved: <strong data-testid="cap-unserved">{r.total_unserved_mw.toFixed(2)} MW</strong>
+          {line && <> | Line {line.idx} flow: <span data-testid="cap-flow">{Math.abs(r.flows[line.idx] ?? 0).toFixed(2)} MW</span></>}
+          </>
+        )}
       </p>
     </section>
   )
