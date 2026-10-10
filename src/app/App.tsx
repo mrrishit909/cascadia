@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useRef } from 'react'
 import { AppProvider, useApp } from './state'
 import { RemoveNode } from '../interactions/RemoveNode'
 import { AlterCapacity } from '../interactions/AlterCapacity'
@@ -24,6 +24,8 @@ import { setIntroChromeVisible } from '../scenes/introChromeState'
 import { setIntroSkipped } from '../scenes/introSkipState'
 import { ChapterTitle } from '../scenes/ChapterTitle'
 import { LegendPlate } from '../scenes/LegendPlate'
+import { Chapter2Scene } from '../scenes/Chapter2Scene'
+import { BalanceRule } from '../scenes/BalanceRule'
 import type { Precomputed, SolveResult } from '../engine/types'
 import '../scenes/experience.css'
 
@@ -34,13 +36,31 @@ export function Scene() {
   const active = useActiveChapter(CHAPTER_IDS)
   const stageRef = useRef<HTMLDivElement>(null)
   const introRef = useRef<HTMLElement>(null)
+  const ch2Ref = useRef<HTMLElement>(null)
   const camera = usePresentationCamera()
   // Camera-ownership rule (presentationCamera.ts, phase 3 rule 10): reset to a known-good default the
   // instant the active chapter changes, BEFORE that chapter's own scene gets a chance to claim anything
   // -- so a chapter with no camera work of its own (most of them; ART_DIRECTION.md's motion table has
   // only chapters 2/3 as scroll-scrubbed) never inherits a stale camera left behind by whichever chapter
   // was active before it.
-  useEffect(() => { resetCameraToDefault(active) }, [active])
+  //
+  // Deliberately NOT a useEffect (the original form here): React runs effects children-before-parents
+  // for BOTH useEffect and useLayoutEffect, regardless of nesting -- there is no "parent effect always
+  // runs before child effects in the same commit" guarantee to lean on. useGSAP (what every chapter
+  // scene's useScene is built on) uses useLayoutEffect internally, so a chapter scene's own camera claim
+  // (a child, layout effect) was firing BEFORE this reset (the parent, a plain effect, which React defers
+  // until after every layout effect in the whole tree has run) -- meaning the reset always ran LAST and
+  // silently clobbered whatever the scene had just claimed. Confirmed directly via a real e2e test
+  // (Chapter2Scene's reduced-motion branch claiming a panned camera, then reading back the DEFAULT
+  // camera instead), not assumed from reading the code. Fixed by moving this into the render body itself
+  // (guarded by a ref so it only fires once per actual `active` transition): render runs fully, for the
+  // whole tree, before ANY effect (layout or passive) does, so this now unconditionally precedes every
+  // scene's own claim regardless of effect type or component nesting.
+  const prevActiveForCamera = useRef<string | null>(null)
+  if (prevActiveForCamera.current !== active) {
+    resetCameraToDefault(active)
+    prevActiveForCamera.current = active
+  }
   // Story/lab boundary (CHAPTER_ARCHITECTURE.md section 1): ch4's own precomputed fixture, fetched
   // directly, never through the live solver. Chapters 2/3's story is the baseline fixture itself
   // (state.baseline, already loaded) -- confirmed against the plan: both controls' divergence is
@@ -139,16 +159,18 @@ export function Scene() {
       <section id="ch1" className="chapter-section" data-archetype="immersive" />
       <LegendPlate active={active === 'ch1'} network={state.network} baseline={state.baseline} />
 
-      <section id="ch2" className="chapter-section">
+      <section id="ch2" ref={ch2Ref} className="chapter-section">
         <div className="chapter-prose">
           <ChapterTitle sceneId="title-ch2" active={active === 'ch2'}>FIG. 02 &mdash; Demand and generation</ChapterTitle>
           <p>Raise load at a bus or reduce a generator&apos;s output limit to see dispatch respond.</p>
+          <BalanceRule baseline={state.baseline} />
         </div>
         <div className="chapter-controls-column">
           <IncreaseLoad placement="home" />
           <ReduceGenerator placement="home" />
         </div>
       </section>
+      <Chapter2Scene sectionRef={ch2Ref} active={active} />
 
       <section id="ch3" className="chapter-section">
         <div className="chapter-prose">

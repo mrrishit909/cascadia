@@ -53,3 +53,10 @@ export function usePresentationCamera(): Camera {
 
 // Test/debug only: which scene last successfully wrote the camera.
 export function getCameraOwner(): string | null { return currentOwner }
+
+// Linear interpolation between two cameras, shared by every scroll-scrubbed chapter (2's pan into
+// the editorial split, 3's zoom into the corridor strip) so each one doesn't hand-roll its own lerp.
+export function lerpCamera(from: Camera, to: Camera, t: number): Camera {
+  const c = Math.max(0, Math.min(1, t))
+  return { x: from.x + (to.x - from.x) * c, y: from.y + (to.y - from.y) * c, w: from.w + (to.w - from.w) * c, h: from.h + (to.h - from.h) * c }
+}

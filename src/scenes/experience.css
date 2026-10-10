@@ -80,6 +80,25 @@
 .chapter-prose { max-width: 62ch; }
 .chapter-controls-column { max-width: 420px; }
 
+/* Chapter 2's balance rule (ART_DIRECTION.md section 3): one rule, two states crossfaded by
+   Chapter2Scene's scroll-scrub -- both rows occupy the SAME box (absolute inset:0 over a sized
+   relative container) so the transition reads as a morph, not two stacked blocks. */
+.balance-rule { position: relative; min-height: 32px; margin: var(--sp-4) 0; border-top: var(--border-hairline); border-bottom: var(--border-hairline); padding: var(--sp-3) 0; }
+.balance-rule-row {
+  position: absolute;
+  inset: var(--sp-3) 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 20px;
+  line-height: 24px;
+  font-stretch: 75%;
+  font-weight: 560;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.balance-rule-row span:first-child { color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+
 .fig-index {
   position: fixed;
   left: var(--sp-5);
@@ -181,6 +200,11 @@
   .stage-sticky[data-active-chapter="ch4"] .stage-inner { width: 100%; margin: 0; height: 55vh; align-self: flex-start; }
   .stage-sticky[data-active-chapter="ch3"] .stage-inner { width: 96px; margin: var(--sp-3); }
   .chapter-section { padding: var(--sp-8) var(--sp-4); }
+  /* ART_DIRECTION.md's responsive table, chapters 2/4 tablet+mobile: "Network on top (55vh), prose
+     below" -- without this, the section's own content starts at the section's top padding same as
+     every other chapter, directly under/overlapping the fixed 55vh network strip above it (caught via
+     a real screenshot: the "Increase load" card sat on top of the network instead of below it). */
+  #ch2.chapter-section, #ch4.chapter-section { padding-top: calc(55vh + var(--sp-6)); justify-content: flex-start; }
 }
 
 @media (max-width: 719px) {

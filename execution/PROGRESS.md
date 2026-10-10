@@ -462,26 +462,87 @@ shell), not new to chapter 1, and not fixed here; still open for a dedicated res
 Test counts: 56/56 vitest (+4: ChapterTitle), 64/64 e2e (+6: chapter1.spec.ts), 32/32 pytest, clean
 build.
 
+## Chapter 2 ("Demand and generation") landed
+
+Editorial split, prose-led. New: `src/scenes/Chapter2Scene.tsx` (this project's FIRST real
+ScrollTrigger scrub -- the intro deliberately avoided ScrollTrigger's own toggle/progress heuristics
+for its one-shot beats; a genuinely continuous scroll-bound pan is a different, legitimate use of the
+same plugin) and `src/scenes/BalanceRule.tsx` (the generation/demand rule ART_DIRECTION.md section 3
+calls for, real totals from `state.baseline.result`, never progress-derived -- no count-up numbers).
+Scroll progress 0-1 over the section pans/zooms the camera (`FULL_CAMERA` to a modest pan+zoom,
+`lerpCamera`, new in `presentationCamera.ts`) and crossfades the balance rule's generation row into
+its demand row (two `position:absolute` rows over the same box, so the transition reads as a morph,
+not two stacked blocks).
+
+**A second real architectural bug found and fixed, more serious than chapter 1's:** `App.tsx`'s
+camera-ownership reset (`resetCameraToDefault(active)`, meant to run "before that chapter's own scene
+can claim anything") was a plain `useEffect`. `useGSAP` (what every chapter scene's `useScene` is
+built on) uses `useLayoutEffect` internally. React runs ALL layout effects across the WHOLE tree
+(children before parents) before ANY plain effect runs, with no exception for a parent/child
+relationship -- so `Chapter2Scene`'s own camera claim (a child, layout effect) was firing BEFORE
+`Scene`'s reset (the parent, a plain effect that React defers until every layout effect anywhere has
+run), and the reset then ran LAST and silently clobbered whatever the scene had just claimed. This
+was invisible in a 1-second screenshot glance (both states render a network, just at a subtly
+different zoom) but caught by a direct computed-style/attribute check the moment an e2e test actually
+asserted the expected `viewBox` value and it didn't match. Confirmed by reading `@gsap/react`'s own
+source (`useIsomorphicLayoutEffect = useLayoutEffect` in the browser) before fixing, not assumed.
+Fixed by moving the reset out of `useEffect` entirely into `Scene`'s render body itself, guarded by a
+`useRef` so it fires at most once per real `active` transition: a full render pass (the whole tree)
+completes before ANY effect of either kind runs, so this now unconditionally precedes every scene's
+own claim regardless of effect type or component nesting -- the actual ordering guarantee the
+original code's own comment wanted but a plain `useEffect` could never provide. This fix is general
+(not chapter-2-specific) and will matter again for chapter 3's own camera-driven corridor-strip morph.
+
+**A third, smaller bug found via the same screenshot-reading discipline:** tablet/mobile's "network on
+top (55vh), prose below" composition for chapters 2 and 4 had no `padding-top` reserving that space,
+so the chapter's own title/cards rendered starting at the section's normal padding, directly
+underneath/overlapping the fixed network strip. Fixed with a targeted `padding-top: calc(55vh +
+var(--sp-6))` override for `#ch2`/`#ch4` in the existing `max-width:1023px` breakpoint.
+
+**Reduced motion's own composition bug:** both balance-rule rows are `position:absolute` over the
+identical box for the crossfade; setting both to `opacity:1` for reduced motion's "both stacks shown"
+state (per the motion table) produced illegible double-exposed overlapping text, not two readable
+lines. Fixed by also un-stacking both rows to `position:static` specifically in the reduced-motion
+branch, so they render as two normal, separate lines instead.
+
+Verified: entry (near-zero scrub progress, generation row dominant), a safely-mid-range scrub point
+(camera panned, balance rule blended ~50/50, both confirmed via direct computed-style reads, not just
+a screenshot glance), leaving the chapter (camera resets to `FULL_CAMERA`), reduced motion (end-state
+camera + both rows shown, non-overlapping), and analytical-state preservation (no solver Worker
+created by scrolling/scrubbing alone) -- `e2e/chapter2.spec.ts`, 5 new tests. Real screenshots at all
+3 required breakpoints (tablet/mobile reshot after the padding-top fix) plus reduced motion, actually
+read before calling this chapter done: `verification/SCREENSHOTS/ch2-desktop-1440x900-entry.png`,
+`ch2-desktop-1440x900-mid-scrub.png`, `ch2-tablet-768x1024.png`, `ch2-mobile-390x844.png`,
+`ch2-reduced-motion.png`.
+
+Test counts: 56/56 vitest, 69/69 e2e (+5: chapter2.spec.ts), 32/32 pytest, clean build.
+
 ## Resume point if this session ends mid-chapter-work
 
 Check `git log --oneline -10` for the most recent commit, and re-read this file plus
 `docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` and `docs/ART_DIRECTION.md` section 4 (storyboard/motion
 table) by then. The shared GSAP lifecycle layer, the FULL intro sequence (beats 1-4, Skip, chrome
-reveal), the shared `ChapterTitle` masked-reveal primitive, and chapter 1 ("Grid formation") are built,
-verified, and committed -- this is the pattern every subsequent scene should follow (`useScene`, not raw
-`useGSAP`/`ScrollTrigger`; one continuous timeline per scene, killed at the top of every `setup()` call,
-not left to the scope-revert mechanism alone; `ChapterTitle` reused as-is, not reinvented per chapter).
+reveal), the shared `ChapterTitle` masked-reveal primitive, chapter 1 ("Grid formation"), and chapter 2
+("Demand and generation", the first real scroll-scrub + the camera-ownership effect-ordering fix) are
+built, verified, and committed -- this is the pattern every subsequent scene should follow (`useScene`,
+not raw `useGSAP`/`ScrollTrigger`; one continuous timeline per one-shot scene, OR a real ScrollTrigger
+scrub for a continuously scroll-bound one like chapter 2/3; camera writes go through `claimCamera`, and
+`Scene`'s own reset in `App.tsx` is now in the render body, NOT a `useEffect` -- do not revert that
+without re-reading the comment explaining why).
 
-**Before building chapter 2's camera scrub**, re-verify the `.chapter-section` background-transparency
-fix hasn't been quietly reintroduced somewhere, and remember the lesson that caused it to be found:
-take and READ a real (non-`fullPage`) screenshot at the chapter's actual scroll position before trusting
-anything about a chapter's visual state, never a full-page capture alone.
+**Before trusting ANY chapter's visual or camera state**, take and READ a real (non-`fullPage`)
+screenshot at the chapter's actual scroll position, AND cross-check the specific thing that matters
+(a `viewBox` attribute, a `data-*` flag, computed opacity) via direct `evaluate`/`getAttribute` --
+chapter 1's background bug and chapter 2's effect-ordering bug were BOTH invisible to a quick visual
+glance and only surfaced by checking the actual DOM/computed state, not assumed from reading the code
+or trusting a screenshot alone.
 
-Continue with chapter 2 ("demand and generation": editorial split, prose-led, scroll-scrubbed camera
-pan into cols 6-12 at ~60% scale plus a generation/demand balance-rule morph), then chapters 3-6 in
-order, each verified (vitest + real-browser e2e + real screenshots at all 3 breakpoints + reduced
-motion, actually read, not just generated) and committed before moving to the next. After chapter 6:
-production frame-pacing measurement against ART_DIRECTION.md section 4's kill criteria (chapter 4
-fracture + a lab node removal, glow on; p95 <=16.7ms desktop, <=33.3ms mobile/throttled), then an
-independent adversarial review in an isolated worktree per the directive's phase 6, then final release
-readiness per phase 8. Do not claim performance compliance or final acceptance without that evidence.
+Continue with chapter 3 ("capacity bottlenecks": focused inspector, NO large network at all -- a
+locator inset top-left plus the corridor-strip morph ART_DIRECTION.md section 3 describes, using the
+same `lerpCamera`/ScrollTrigger-scrub pattern chapter 2 just established), then chapters 4-6 in order,
+each verified (vitest + real-browser e2e + real screenshots at all 3 breakpoints + reduced motion,
+actually read, not just generated) and committed before moving to the next. After chapter 6: production
+frame-pacing measurement against ART_DIRECTION.md section 4's kill criteria (chapter 4 fracture + a lab
+node removal, glow on; p95 <=16.7ms desktop, <=33.3ms mobile/throttled), then an independent adversarial
+review in an isolated worktree per the directive's phase 6, then final release readiness per phase 8. Do
+not claim performance compliance or final acceptance without that evidence.
