@@ -17,7 +17,11 @@ import { Chapter4Ledger } from '../scenes/Chapter4Ledger'
 import { useFixture } from '../scenes/useFixture'
 import { chapter2Diverged, chapter3Diverged, chapter4Diverged } from './chapterDivergence'
 import { resetCameraToDefault, usePresentationCamera } from '../scenes/presentationCamera'
-import { IntroBeat1 } from '../scenes/IntroBeat1'
+import { IntroSequence } from '../scenes/IntroSequence'
+import { SkipIntro } from '../scenes/SkipIntro'
+import { useIntroFaultActive, setIntroFaultActive } from '../scenes/introFixtureState'
+import { setIntroChromeVisible } from '../scenes/introChromeState'
+import { setIntroSkipped } from '../scenes/introSkipState'
 import type { Precomputed, SolveResult } from '../engine/types'
 import '../scenes/experience.css'
 
@@ -40,6 +44,8 @@ export function Scene() {
   // (state.baseline, already loaded) -- confirmed against the plan: both controls' divergence is
   // measured against baseline's own Scen defaults, so baseline IS their un-diverged story.
   const ch4Fixture = useFixture<Precomputed>('precomputed/ch4_fault_bus26.json')
+  const introFixture = useFixture<Precomputed>('precomputed/intro_fault_line33.json')
+  const introFaultActive = useIntroFaultActive()
 
   if (state.load === 'loading') return <p role="status">Loading baseline</p>
   if (state.load === 'error' || !state.network || !state.result || !state.baseline) return <p role="alert">Could not load data: {state.error}</p>
@@ -72,12 +78,21 @@ export function Scene() {
     stageRemovedBus = state.removedBus
     stageDisabledLines = state.disabledLines
     stageAlteredLines = Object.keys(state.lineCapacity).map(Number)
+  } else if (active === 'intro' && introFaultActive) {
+    // ART_DIRECTION.md opening storyboard beat 4: the stage swaps to the post-fault fixture
+    // (presentation-only, src/scenes/introFixtureState.ts) once IntroSequence's timeline reaches 9s,
+    // or immediately for skip/reduced-motion. Never touches state.result/the live scenario.
+    stageResult = introFixture?.result ?? state.baseline.result
+    stageDisabledLines = introFixture ? [33] : []
   }
-  // intro/ch1/ch5: baseline, no live override -- chapter 1 has no controls at all, chapter 5's stage is
-  // hidden via CSS regardless of what props it receives.
+  // ch1/ch5 (and intro before its fault beat): baseline, no live override -- chapter 1 has no controls
+  // at all, chapter 5's stage is hidden via CSS regardless of what props it receives.
 
   return (
     <main className="experience">
+      {/* First in tab order per DESIGN_SYSTEM.json's skipIntro token ("position: top-right, first in
+          tab order"). */}
+      <SkipIntro active={active} onSkip={() => { setIntroSkipped(true); setIntroFaultActive(true); setIntroChromeVisible(true) }} />
       <FigIndex active={active} />
       <StatusRegion />
       <RestorationStatusRegion />
@@ -93,7 +108,11 @@ export function Scene() {
             selectedBus={state.selectedBus} onSelect={bus => dispatch({ type: 'select', bus })}
             selectedLine={state.selectedLine} onSelectLine={line => dispatch({ type: 'selectLine', line })}
             alteredLines={stageAlteredLines} disabledLines={stageDisabledLines}
-            onRestoreLine={line => void setLineOutage(line, false)}
+            // Gated during the intro's own presentation-only fault (stageDisabledLines=[33] above comes
+            // from a fixture, not state.disabledLines) -- without this, clicking the fault kerf during
+            // the intro would fire a REAL setLineOutage(33, false) against a line that was never
+            // actually disabled in live state, found during IntroSequence's own review.
+            onRestoreLine={active === 'intro' ? undefined : (line => void setLineOutage(line, false))}
             candidates={state.candidates} addedLines={state.addedLines}
             // pending-aware, not just confirmed state.addedLines: a second click while this exact
             // add/remove is still in flight must continue the SAME direction, not flip it (matches
@@ -113,7 +132,7 @@ export function Scene() {
           depends on would run its useGSAP layout effect while that ref is still null. Confirmed directly
           (not assumed): IntroBeat1 silently did nothing in production because introRef.current read null
           at setup() time when this was ordered before the section; moving it here fixed it. */}
-      <IntroBeat1 stageRef={stageRef} introRef={introRef} active={active} />
+      <IntroSequence stageRef={stageRef} introRef={introRef} active={active} network={state.network} flows={state.baseline.result.flows} />
 
       <section id="ch1" className="chapter-section" data-archetype="immersive">
         <h2>FIG. 01 &mdash; Grid formation</h2>

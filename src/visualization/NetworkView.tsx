@@ -102,6 +102,30 @@ function lineBrackets(ax: number, ay: number, bx: number, by: number, key: strin
     </g>
   )))
 }
+// networkEncoding.loadServed/loadShedEconomic: a downward chevron below the bus, length proportional to
+// served MW (DESIGN_SYSTEM.json: "glyph": "downward chevron below the bus, length proportional to
+// served MW"), with a solid diagnostic-colored wedge at the tip sized by the shed fraction when any load
+// is shed economically. `maxLoadMw` normalizes length across the whole network (the fixture's own peak
+// demand, not a per-render guess) so chevron length is comparable bus to bus. Drawn below served/
+// shed_economic buses only -- infeasible/removed/isolated buses have their own distinct glyphs already
+// and showing a chevron under them would misrepresent "how much is actually getting through."
+function loadChevron(servedMw: number, shedMw: number, maxLoadMw: number) {
+  const demand = servedMw + shedMw
+  if (demand <= 0) return null
+  const len = 6 + 14 * Math.min(1, demand / Math.max(maxLoadMw, 1)) // 6-20px, DESIGN_SYSTEM has no fixed range; chosen to stay legible at r=7 bus scale
+  const armW = 5
+  const topY = 10, tipY = topY + len
+  const shedFrac = demand > 0 ? shedMw / demand : 0
+  const wedgeY = tipY - len * shedFrac
+  return (
+    <g aria-hidden="true" data-testid="load-chevron">
+      <path d={`M ${-armW} ${topY} L 0 ${tipY} L ${armW} ${topY}`} stroke={TEXT} strokeWidth={1.5} fill="none" strokeLinejoin="round" />
+      {shedFrac > 0 && (
+        <path d={`M ${-armW * shedFrac} ${wedgeY} L 0 ${tipY} L ${armW * shedFrac} ${wedgeY} Z`} fill={DIAGNOSTIC} stroke="none" />
+      )}
+    </g>
+  )
+}
 // Buses: brackets on a square 6px outside the ring (r=7).
 function busBrackets(key: string) {
   const s = 13, arm = 5
@@ -218,6 +242,16 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
   const infeasible = result.status === 'infeasible'
   const noGen = useMemo(() => new Set(result.islands.filter(i => i.kind === 'shed_no_generation').flatMap(i => i.buses)), [result])
   const pos = useMemo(() => project(network, orientation === 'portrait'), [network, orientation])
+  // networkEncoding.loadServed: per-bus demand, for the load chevron glyph. `loadByBus`/`maxLoadMw` are
+  // from the NETWORK's own fixed demand data (network.loads), not scaled by the live result -- the
+  // chevron's LENGTH is normalized against the network's peak demand so it's comparable bus to bus
+  // across any scenario, not just the one currently showing.
+  const loadByBus = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const l of network.loads) m.set(l.bus, (m.get(l.bus) ?? 0) + l.p_mw)
+    return m
+  }, [network])
+  const maxLoadMw = useMemo(() => Math.max(1, ...network.loads.map(l => l.p_mw)), [network])
   const flowVals = Object.values(result.flows).map(Math.abs)
   const maxFlow = Math.max(...(flowVals.length ? flowVals : [0]), 1)
 
@@ -328,7 +362,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             {/* networkEncoding.bindingLine: copperHot core with a copper casing either side (double rule) */}
             {v.casing && <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={v.casing} strokeWidth={width + 2} strokeLinecap="round" />}
-            <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={v.stroke} strokeWidth={width} strokeLinecap="round" strokeDasharray={v.dash} />
+            <line data-testid="line-core" x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={v.stroke} strokeWidth={width} strokeLinecap="round" strokeDasharray={v.dash} />
             {interactive && lineFocusRing(a.x, a.y, b.x, b.y, width / 2 + (v.casing ? 1 : 0))}
             {interactive && sel && lineBrackets(a.x, a.y, b.x, b.y, `sel-${l.idx}`)}
           </g>
@@ -395,6 +429,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
               <circle r={7} fill={isolated ? DIAGNOSTIC_DIM : INK} stroke={stroke} strokeWidth={2}
                 strokeDasharray={isolated ? '3 2' : undefined} />
               {removed && <path d="M-5-5L5 5M5-5L-5 5" stroke={stroke} strokeWidth={2} />}
+              {!removed && !isolated && loadChevron(Math.max(0, (loadByBus.get(b.idx) ?? 0) - (result.shed[b.idx] ?? 0)), result.shed[b.idx] ?? 0, maxLoadMw)}
               {interactive && selectedBus === b.idx && busBrackets(`sel-${b.idx}`)}
               {interactive && busFocusRing()}
               <text y={-15} textAnchor="middle" fontSize={11} fill="#9AA5B1">{b.name}</text>

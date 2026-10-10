@@ -88,6 +88,28 @@
 .fig-index a[aria-current="step"] { color: var(--copper); border-left-color: var(--copper); }
 .fig-index a:focus-visible { outline: var(--border-active); outline-offset: 2px; }
 
+/* ART_DIRECTION.md opening storyboard beat 4: "FIG index, SKIP/ENTER controls and the status region
+   fade in." [data-chrome-visible] is set by useIntroChromeVisible() (src/scenes/introChromeState.ts) on
+   the FIG index, Reset button, and SKIP INTRO -- all stay mounted throughout, this only controls
+   opacity/interactivity (the `inert` attribute each one also carries handles focus/AT removal). */
+.fig-index, .skip-intro, button[data-chrome-visible] {
+  opacity: 0;
+  transition: opacity 240ms var(--ease-enter, ease);
+}
+.fig-index[data-chrome-visible="true"], .skip-intro[data-chrome-visible="true"], button[data-chrome-visible="true"] {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fig-index, .skip-intro, button[data-chrome-visible] { transition: none; }
+}
+
+.skip-intro {
+  position: fixed;
+  top: var(--sp-5);
+  right: var(--sp-5);
+  z-index: 20;
+}
+
 @media (max-width: 1023px) {
   .fig-index { left: 0; top: 0; transform: none; flex-direction: row; width: 100%; padding: var(--sp-3) var(--sp-4); background: var(--surface); position: sticky; }
   .stage-sticky { top: 44px; height: calc(100vh - 44px); }

@@ -46,12 +46,60 @@ test("rapid scroll straight to chapter 6 does not leave the network stuck invisi
 
 test.describe("reduced motion", () => {
   test.use({ reducedMotion: "reduce" });
-  test("loads the final frame directly: every bus/line visible from the start, no blackout beat", async ({ page }) => {
+  test("loads the intro's final frame directly: every bus/line visible, the beat-4 fault already active, chrome already visible", async ({ page }) => {
+    // The intro's own reduced-motion end state is beat 4's end state (fault + chrome visible), per
+    // ART_DIRECTION.md's global rule 5 combined with the opening storyboard -- distinct from chapter 1's
+    // OWN reduced-motion state (plain baseline, no fault), which newControls.spec.ts/the chapter suite
+    // covers separately.
     await page.goto("/");
     const hero = page.locator('[data-testid="bus"][data-bus="0"]');
     const other = page.locator('[data-testid="bus"][data-bus="1"]');
     await expect(hero).toHaveCSS("opacity", "1");
     await expect(other).toHaveCSS("opacity", "1");
+    await expect(page.locator('[data-testid="line"][data-line="33"]')).toHaveAttribute("data-outaged", "true");
+    await expect(page.locator(".fig-index")).toHaveCSS("opacity", "1");
+    await expect(page.getByRole("button", { name: "Skip intro" })).toHaveCSS("opacity", "1");
+  });
+});
+
+test.describe("beats 2-4 and skip (no-preference, real timeline)", () => {
+  test("full playback: lines assemble, then the fault activates around 9s with chrome fading in after", async ({ page }) => {
+    await page.goto("/");
+    const line33 = page.locator('[data-testid="line"][data-line="33"]');
+    const figIndex = page.locator(".fig-index");
+    // Before beat 4, the fault hasn't happened and chrome is still invisible.
+    await expect(line33).not.toHaveAttribute("data-outaged", "true");
+    await expect(figIndex).toHaveCSS("opacity", "0");
+    await expect(line33).toHaveAttribute("data-outaged", "true", { timeout: 11000 });
+    await expect(figIndex).toHaveCSS("opacity", "1", { timeout: 2000 });
+  });
+
+  test("Skip intro jumps to the final frame instantly and the superseded timeline never re-applies its own beats afterward", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForTimeout(1000); // mid beat 1, well before beats 2-4 would otherwise run
+    await page.getByRole("button", { name: "Skip intro" }).click();
+    const other = page.locator('[data-testid="bus"][data-bus="1"]');
+    const core = page.locator('[data-testid="line"][data-line="0"] [data-testid="line-core"]');
+    await expect(other).toHaveCSS("opacity", "1");
+    await expect(page.locator('[data-testid="line"][data-line="33"]')).toHaveAttribute("data-outaged", "true");
+    await expect(page.locator(".fig-index")).toHaveCSS("opacity", "1");
+    // Discriminating regression check: a superseded timeline that kept running after Skip would re-dash
+    // this line's core at beat 3 (~6s) or flicker the fault line at beat 4 (~9s). Wait past both and
+    // confirm the skip-to state still holds, with no leftover dash styling from beat 2/3.
+    await page.waitForTimeout(9000);
+    await expect(other).toHaveCSS("opacity", "1");
+    await expect(core).toHaveCSS("stroke-dasharray", "none");
+  });
+
+  test("scrolling away mid-playback stops the intro timeline from touching chapter DOM later", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForTimeout(4000); // mid beat 2, lines still assembling
+    await page.locator("#ch2").scrollIntoViewIfNeeded();
+    const core = page.locator('[data-testid="line"][data-line="0"] [data-testid="line-core"]');
+    // Discriminating regression check: a superseded timeline left alive would still fire beat 3's
+    // dash-loop (~6s) and beat 4's fault swap (~9s) against DOM that's now showing a different chapter.
+    await page.waitForTimeout(8000);
+    await expect(core).toHaveCSS("stroke-dasharray", "none");
   });
 });
 

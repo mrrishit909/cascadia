@@ -320,24 +320,90 @@ ART_DIRECTION.md's motion table).
 Test counts as of `007e9d3`: 49/49 vitest, 55/55 e2e (6 new motion-specific, `reducedMotion:
 "no-preference"` opted in explicitly), 32/32 pytest, clean build.
 
-**Not yet done:** beats 2-4 of the intro storyboard (lines assembling via stroke-dashoffset, demand
-pulses, the fault interrupt swapping to `intro_fault_line33.json`), SKIP INTRO control, the FIG index's
-own entry animation, and all 6 chapters' real choreography (camera scrub for 2/3, the single-tween
-fracture for 4, the step-driven comparison for 5, result-driven feedback for 6). Frame-pacing measurement
-against ART_DIRECTION.md's kill criteria has NOT been done yet -- do this once beat 1-4 and at least one
-chapter's glow-filter-under-transform case exist, not before (measuring a single opacity/filter tween in
-isolation wouldn't be representative). Portrait-specific NetworkView layouts exist (`orientation=
-"portrait"` prop, camera support) but are not yet wired into the chapter shell's tablet/mobile CSS
-breakpoints. Remaining P2/P3 items from the earlier independent review (visible status plate,
-chapterDivergence.test.ts going through the real reducer, Worker termination on unmount) still tracked,
-land alongside chapter work.
+## Intro beats 2-4 + SKIP INTRO landed -- `IntroBeat1.tsx` replaced by `IntroSequence.tsx`
+
+Built on top of the shared infrastructure above, as one continuous one-shot GSAP timeline (not four
+separate scenes) covering the full 0-12s storyboard:
+- **Beat 2 (3-6s)**: real breadth-first search over `network.lines` from the hero bus (`bfsFromHero`,
+  not DOM inference) drives both the order lines draw in (DrawSVGPlugin `stroke-dashoffset`) and the
+  order each bus fades in.
+- **Beat 3 (6-9s)**: a dash-offset pulse loop on every line core whose baseline flow is non-negligible,
+  direction set from that line's REAL flow sign (not a uniform direction regardless of topology -- an
+  advisor review caught the first version doing exactly that). Load chevrons (already rendered by
+  NetworkView from the fixture, never tweened as a number) fade in alongside.
+- **Beat 4 (9-12s)**: the whole stage crossfades (0.35s out, swap, 0.35s in -- a real 700ms transition)
+  to `intro_fault_line33.json` (presentation-only, via `introFixtureState.ts`; `AppState`/the live
+  scenario never changes), then the FIG index/Reset button/SKIP INTRO fade in (`introChromeState.ts`).
+- **SKIP INTRO** (`SkipIntro.tsx`): always mounted (never conditionally rendered, per the project's
+  standing rule against mount-on-demand controls), `inert`+opacity-driven by `active==='intro'` directly
+  rather than the chrome-visibility store, since it must be clickable from beat 1 onward -- it's what
+  TRIGGERS the chrome reveal, not something gated by it. Resolves to the identical end state as reduced
+  motion (`introSkipState.ts`), per `DESIGN_SYSTEM.json`'s own token.
+
+**Real bugs found by an advisor review before this was committed, each fixed and verified, not just
+noted:**
+1. A superseded one-shot timeline was never killed between `setup()` calls -- re-entering the intro,
+   leaving it mid-playback, or clicking Skip mid-playback would leave a stale timeline still firing its
+   own `.set`/`.to`/`.call` steps later, re-dashing lines or re-triggering the fault after the user had
+   already moved on. Fixed: `tlRef.current?.kill()` as the FIRST line of every `setup()` call, before
+   either early-return branch, plus an unmount cleanup effect. Two new discriminating e2e tests prove
+   this (`introMotion.spec.ts`: Skip-then-wait-9s, and scroll-away-then-wait-8s, both assert no leftover
+   dash styling).
+2. `clearProps: 'drawSVG'` is not a real CSS property name -- traced directly in
+   `node_modules/gsap/DrawSVGPlugin.js`, which actually writes `strokeDasharray`/`strokeDashoffset`
+   inline. The old clearProps call did nothing; fixed to clear the real property names.
+3. A live-control leak: the intro's presentation-only fault (`stageDisabledLines=[33]` from a fixture,
+   not `state.disabledLines`) made the fault line's kerf clickable via `onRestoreLine`, which would have
+   fired a REAL `setLineOutage(33, false)` against a line that was never actually disabled in live
+   state. Fixed: `onRestoreLine` is `undefined` while `active==='intro'`.
+4. The candidate-line overlay (`[data-testid="candidate-line"]`, always rendered on the one persistent
+   stage regardless of chapter -- confirmed intentional, not a bug, since `e2e/addLine.spec.ts`
+   deliberately checks it before ever scrolling to chapter 6) was not included in beat 1's hide set.
+   Caught by actually taking and reading real screenshots (`verification/SCREENSHOTS/intro-beat1.png`
+   through `intro-beat4.png`) per this project's mandatory visual-QA rule, not assumed from reading the
+   code: beat 1's "blackout, single energized node" showed every candidate line crossing the dark stage.
+   Fixed by adding candidate lines to the beat 1/convergence hide set, revealed again at beat 2's end.
+5. Load chevrons live inside bus `<g>` groups, so beat 2's per-bus opacity reveal was making them pop in
+   early (ahead of beat 3's own fade-in). Fixed: chevrons get their own explicit opacity-0 in beat 1,
+   independent of the ancestor bus group's opacity.
+6. SKIP INTRO's own token says "first in tab order"; it was rendering after FigIndex/ResetButton. Moved
+   to the first child of `<main>`.
+7. A freshly built, playing GSAP timeline does not paint its time-0 state until the next ticker frame --
+   without forcing `tl.render(0, true, true)` after building it, beat 1's blackout would flash the
+   pre-animation default for one frame after mount, now that beat 1 lives inside the same timeline as
+   beats 2-4 (the old standalone `gsap.set()` calls applied synchronously for free; a `.set()` queued
+   inside a timeline does not).
+
+`presentationCamera`'s ownership/reset tests, previously living inside the now-deleted
+`IntroBeat1.test.tsx`, were moved to their own `src/scenes/presentationCamera.test.tsx` rather than lost
+in the swap (a reviewer caught the test count silently dropping from 49 to 42 when the old file was
+deleted without porting its non-beat-1-specific tests first).
+
+Test counts: 52/52 vitest (up from 49: +3 net, after moving 3 camera tests out and adding 1 net new
+timeline-kill regression plus losing none), 58/58 e2e (+9: `introMotion.spec.ts` now covers full
+playback timing, Skip, and the two timeline-kill discriminating checks), 32/32 pytest, clean build. Real
+screenshots of all 4 beats: `verification/SCREENSHOTS/intro-beat1.png` through `intro-beat4.png`.
+
+**Not yet done:** the FIG index's own entry animation (currently a plain opacity fade via CSS, not a
+distinct GSAP-authored motion), and all 6 chapters' real choreography (camera scrub for 2/3, the
+single-tween fracture for 4, the step-driven comparison for 5, result-driven feedback for 6). Frame-
+pacing measurement against ART_DIRECTION.md's kill criteria has NOT been done yet -- do this once at
+least one chapter's glow-filter-under-transform case exists too, not before (measuring the intro alone
+wouldn't be representative of steady-state chapter scroll-scrub performance). Portrait-specific
+NetworkView layouts exist (`orientation="portrait"` prop, camera support) but are not yet wired into the
+chapter shell's tablet/mobile CSS breakpoints. Remaining P2/P3 items from the earlier independent review
+(visible status plate, chapterDivergence.test.ts going through the real reducer, Worker termination on
+unmount) still tracked, land alongside chapter work.
 
 ## Resume point if this session ends mid-chapter-work
 
 Check `git log --oneline -10` for the most recent commit, and re-read this file plus
 `docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` and `docs/ART_DIRECTION.md` section 4 (storyboard/motion
-table) by then. The shared GSAP lifecycle layer and intro beat 1 are built, verified, and committed
-(`007e9d3`) -- this is the pattern every subsequent scene should follow (`useScene`, not raw
-`useGSAP`/`ScrollTrigger`). Continue with intro beats 2-4, then chapter 1, then chapters 2-6 in order,
-each verified (vitest + real-browser e2e + screenshots) and committed before moving to the next, per the
-"CINEMATIC ORCHESTRATION" directive's phase 7-8.
+table) by then. The shared GSAP lifecycle layer and the FULL intro sequence (beats 1-4, Skip, chrome
+reveal) are built, verified, and committed -- this is the pattern every subsequent scene should follow
+(`useScene`, not raw `useGSAP`/`ScrollTrigger`; one continuous timeline per scene, killed at the top of
+every `setup()` call, not left to the scope-revert mechanism alone). Continue with chapter 1's own
+choreography, then chapters 2-6 in order, each verified (vitest + real-browser e2e + real screenshots,
+read by a reviewer genuinely independent of whoever built the feature, per this project's mandatory
+visual-QA rule) and committed before moving to the next, per the "CINEMATIC ORCHESTRATION" directive's
+phase 7-8.
