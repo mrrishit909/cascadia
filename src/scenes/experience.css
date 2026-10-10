@@ -188,7 +188,16 @@
      it's the "immersive canvas" archetype, matching chapter 1's own narrow-width treatment) --
      the clearance needed below it is the sticky stage's own full 100vh, not 55vh. */
   #ch6.chapter-section { padding-top: calc(100vh + var(--sp-6)); }
-  #ch6 .chapter-controls-column { position: static; width: auto; max-width: none; height: auto; overflow-y: visible; border-left: none; border-top: var(--border-hairline); padding: var(--sp-5) 0 0; }
+  /* A fresh independent review of the desktop fix caught a real regression here: this reset listed
+     7 desktop-only properties but missed 2 -- `align-self: flex-end` and the desktop-only
+     `margin-right` (up to -160px) set on the base rule above. Left in place, those two alone left
+     the rail shrink-to-fit and shoved off the right edge (measured: real horizontal page overflow,
+     864px content in a 768px tablet viewport, 518px in a 390px mobile viewport, clipping control
+     text/buttons), while `.stage-sticky`'s own `position:sticky` kept the full network pinned
+     on-screen for most of the rail's scroll length -- a persistent overlay, not the "stacked below,
+     zero overlap" layout this breakpoint requires. `width:100%` plus explicitly zeroing both
+     properties is the actual complete reset. */
+  #ch6 .chapter-controls-column { position: static; align-self: auto; width: 100%; max-width: none; height: auto; overflow-y: visible; border-left: none; border-top: var(--border-hairline); padding: var(--sp-5) 0 0; margin-right: 0; }
 }
 .chapter-controls-column { max-width: 420px; }
 

@@ -149,6 +149,50 @@ test.describe("layout: inspector rail is opaque, flush right, anchored, and clea
       }
     });
   }
+
+  // REGRESSION for a defect a FRESH independent review (verifying the fix above) found that the test
+  // above missed: it only checks ONE frame (right after arriving at ch6), which happened to show no
+  // overlap. The rail's `<1023px` reset was missing 2 of the 9 desktop-only properties the base rule
+  // sets (`align-self: flex-end`, a desktop-only negative `margin-right`) -- left in place, those two
+  // alone caused real horizontal page overflow (clipping control text/buttons offscreen) AND, because
+  // `.stage-sticky` stays pinned on screen while this normal-flow rail scrolls past it, a PERSISTENT
+  // overlay for most of the rail's own scroll length, not the "stacked below, zero overlap" layout
+  // this breakpoint requires. Checked here across a real scroll sweep through the rail's own height,
+  // not just the arrival frame.
+  for (const [name, viewport] of [
+    ["tablet", { width: 768, height: 1024 }],
+    ["mobile", { width: 390, height: 844 }],
+  ] as const) {
+    test(`${name}: no horizontal overflow and no persistent network overlay while scrolling through the rail`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto("/");
+      await page.getByRole("link", { name: "FIG. 06" }).click();
+      await page.waitForFunction(() => document.querySelector(".stage-sticky")?.getAttribute("data-active-chapter") === "ch6");
+      await page.waitForTimeout(300);
+      const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+      // A small (~10px) overflow from the FIG-index nav strip's own last link pre-exists site-wide
+      // (confirmed present on chapter 1 too, unrelated to this fix) -- this check is for the rail's
+      // OWN overflow (previously ~96-130px from the stale desktop-only margin/align-self), not that
+      // pre-existing, unrelated nav artifact.
+      expect(scrollWidth).toBeLessThanOrEqual(viewport.width + 15);
+      const docHeight = await page.evaluate(() => document.body.scrollHeight);
+      const startY = await page.evaluate(() => window.scrollY);
+      let sawStageAwayFromRail = false;
+      for (const frac of [0, 0.3, 0.6, 0.9]) {
+        const y = startY + frac * (docHeight - startY - viewport.height);
+        await page.evaluate((yy) => window.scrollTo(0, yy), y);
+        await page.waitForTimeout(150);
+        const stageBox = await page.locator(".stage-sticky").boundingBox();
+        const railBox = await page.locator("#ch6 .chapter-controls-column").boundingBox();
+        if (!stageBox || !railBox) continue;
+        const overlapY = Math.max(0, Math.min(stageBox.y + stageBox.height, railBox.y + railBox.height) - Math.max(stageBox.y, railBox.y));
+        if (overlapY === 0) sawStageAwayFromRail = true;
+      }
+      // a clean "stacked below" layout must, at some point during the sweep, show the network fully
+      // scrolled past (zero vertical overlap with the rail) -- a persistent overlay never does.
+      expect(sawStageAwayFromRail).toBe(true);
+    });
+  }
 });
 
 test("analytical state preservation: scrolling into and out of chapter 6 alone never creates an extra Worker", async ({ page }) => {
