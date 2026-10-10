@@ -898,21 +898,104 @@ verified (vitest + e2e covering entry/midpoint/exit/forward/reverse/instant-jump
 motion/analytical-preservation/live-control-during-motion + real screenshots at all 3 breakpoints,
 actually read, AND the full suite re-run) and committed.
 
-After chapter 6: the full-suite frame-pacing pass across all 6 chapters' heaviest interactions together
-(chapter 3's own measurement is isolated, not a substitute -- chapter 4's fracture and chapter 6's own
-node-removal case, both flagged as still owed their own measurement, are the natural candidates for the
-"heaviest interaction" this final pass should target), then an independent adversarial review in an
-isolated worktree per the directive's phase 6 (given this session's own track record -- 2 serious
-architecture bugs found in self-review, 1 of them this project's worst defect yet -- a genuinely
-independent reviewer should be expected to find more, not treated as a formality), then final release
-readiness per phase 8: full requirement-coverage pass against `specifications/REQUIREMENTS.yaml`'s
-CAS-MOTION-001/CAS-RELEASE-001 rows (both still `unstarted`/`in progress` as of the last read), the
-parent portfolio directive's doc-file list (README/ARCHITECTURE/VISUAL_DESIGN/MOTION_SYSTEM/
-DATA_SOURCES/TESTING/LIMITATIONS/DEPLOYMENT.md -- check which exist already vs. still need writing),
-and `LIMITATIONS.md` updated to include every deliberate simplification documented across chapters 3-5
-(chapter 3's own-rating-normalized bars, chapter 5's `EMPTY_RESULT` per-step mini networks). Do not
-claim performance compliance, requirement completion, or final acceptance without that evidence. Do not
-deploy or publish externally without explicit authorization.
+## Chapter 6 ("Scenario laboratory") landed -- ALL SIX CHAPTERS NOW BUILT
+
+Immersive canvas with the anchored inspector rail. Already functionally complete before this pass (all
+7 controls at their `placement="lab"` mount, the stage already always-live there, per `App.tsx`'s
+existing story/lab switch) -- this pass was motion-only: `Chapter6Scene.tsx`, hooking into the EXISTING
+shared `state.solve`/`state.restoration.status` machines (no new analytical work), dims the stage to
+60% opacity while any control's real Worker solve is in flight and restores it once the result lands
+(feedback 240ms in, state 480ms out, per the motion table's own row 6). Reduced motion still reflects
+the real dimmed/undimmed state, just without the animated transition -- "instant swap" means instant,
+not skipped.
+
+Verified the user's own standing concern once more, in its last and most general form: a SECOND
+control committed while the FIRST's solve is still visibly in flight (dimmed stage) does not leave the
+feedback stuck dimmed or fighting itself once both resolve -- confirmed both the visual settling AND
+that the analytical result actually landed (`data-state="removed"`), not just that the animation looked
+fine. Also verified: idle (full opacity), an interrupted transition (leaving chapter 6 mid-solve leaves
+the stage fully visible elsewhere, not stuck dimmed on return), and analytical-state preservation (no
+Worker from scrolling alone -- the lab's Worker is lazily created only on a real control commit, same
+pattern as every other chapter's own check). `e2e/chapter6.spec.ts`, 6 tests. A dedicated axe-core pass
+over all 7 dual-mounted controls together found zero violations. Real screenshots (idle, mid-solve with
+a real 1.5s WASM-load delay to make the dim state reliably reproducible, reduced-motion, all 3
+breakpoints): `verification/SCREENSHOTS/ch6-desktop-1440x900-idle.png`, `ch6-desktop-1440x900-
+solving.png`, `ch6-reduced-motion-solving.png`, `ch6-tablet-768x1024.png`, `ch6-mobile-390x844.png` --
+the solving screenshot visibly shows the whole network dimmed with "Solving island-aware DC-OPF in
+Worker..." text and disabled Confirm/Cancel buttons, confirming the feedback reads as a real, coherent
+signal, not just a passing assertion.
+
+One locator bug caught and fixed before trusting this chapter's own tests: `lab(page).locator(
+'select').first()` was assumed to hit AlterCapacity's line select, but `RemoveNode` ALSO renders its
+own `<select>` (in addition to SVG bus selection) and comes first in DOM order -- the test was silently
+selecting the wrong control's dropdown. Fixed by using the established `controlLab(page, label)`
+scoping helper instead of a bare `.first()`, the same lesson this project's locator-migration pass
+already learned once and documented in `e2e/helpers/placement.ts`'s own comments; re-learned here
+because a NEW test write didn't apply it, not because the helper itself was wrong.
+
+Test counts: 61/61 vitest, 112/112 e2e (+6 chapter6, +1 a11y), 32/32 pytest, clean build -- full suite
+re-run before committing.
+
+## Resume point: all 6 chapters complete -- final-phase work remains
+
+Check `git log --oneline -12` for the most recent commit, and re-read this file plus
+`docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` and `docs/ART_DIRECTION.md` section 4 by then. The
+shared GSAP lifecycle layer, the full intro sequence, `ChapterTitle`, and all 6 chapters (1 "Grid
+formation" through 6 "Scenario laboratory") are built, reviewed, verified, and committed. CAS-MOTION-001
+(the intro + 6 chapters, captured at every breakpoint with reverse-scroll/reduced-motion variants) is
+now substantively complete at the chapter level -- update its `status` in `specifications/
+REQUIREMENTS.yaml` once the remaining phase-6/phase-8 work below closes it out formally.
+
+**Remaining work, in the order the directive itself specifies (phases 6-8), none of it started yet:**
+
+1. **Full-suite production frame-pacing measurement**, all 6 chapters' heaviest interactions together
+   against the REAL production build, glow on -- not a substitute for chapter 3's own already-complete,
+   isolated measurement (`verification/PERFORMANCE/CH3_FRAMEPACING_REPORT.md`), a NEW, broader pass.
+   Candidates for "heaviest interaction" per ART_DIRECTION.md section 4's own kill-criterion wording
+   ("chapter 4 fracture + a lab node removal, glow on"): chapter 4's single-shot tween (crossfade +
+   island-separation, now real code to measure, not hypothetical) and chapter 6's own node-removal
+   solve+dim-feedback case. Reuse `measure_ch3_framepacing.mjs`'s pattern directly: an idle-baseline
+   control run through the IDENTICAL sampling method is mandatory before concluding any kill-criterion
+   "failure" reflects real app cost, not environment noise (confirmed necessary once already, in
+   chapter 3's own report -- the lesson generalizes, don't re-skip it here).
+2. **Independent adversarial review in an isolated worktree**, per the directive's phase 6. Treat this
+   as substantively necessary, not a formality: this session's own self-review process found 2 serious
+   architecture bugs across 6 chapters (the camera-ownership effect-ordering bug in chapter 2, and the
+   collapse-to-origin GSAP transform bug in chapter 4, this project's worst defect so far) -- a
+   genuinely independent reviewer, with no stake in any of this code having already been "approved,"
+   should be expected to find more, especially in chapter 3's corridor-strip geometry math and chapter
+   5's restoration-index bookkeeping, the two most intricate pieces of new logic this pass added. Fix
+   any P0/P1 found, add regression coverage, re-run the affected suite before re-approving.
+3. **Final release readiness (directive phase 8):**
+   - Full test suite one more time: analytical (pytest), unit (vitest), e2e (Playwright), accessibility
+     (axe-core, already run per-chapter above but worth one more full pass), concurrency
+     (`e2e/concurrency.spec.ts`, already green but re-confirm nothing in chapters 3-6 regressed it).
+   - Responsive and reduced-motion verification: this pass's own per-chapter screenshots cover entry/
+     key-state for each chapter at 3 breakpoints, but a final pass should verify the FULL scroll journey
+     (intro through chapter 6) at each breakpoint in one continuous pass, not just per-chapter
+     snapshots -- and confirm the still-open, already-tracked portrait-layout gap (chapters 2/3/4/5
+     currently reuse scaled-down landscape coordinates, not a true portrait re-projection like chapters
+     1/6 already have) doesn't block acceptance, or explicitly document it as a known limitation if it
+     remains out of scope.
+   - Requirement-coverage pass against `specifications/REQUIREMENTS.yaml`: update CAS-MOTION-001's
+     status/evidence_paths (now substantively done), and CAS-RELEASE-001 (`unstarted` as of the last
+     read -- production build verification, Pages base path, a deployed smoke test, honest
+     `LIMITATIONS.md`) once deployment is actually authorized.
+   - `LIMITATIONS.md`: add every deliberate simplification this pass documented and left honestly
+     unfixed, not silently dropped -- chapter 3's own-rating-normalized flow bars (not a cross-rail MW
+     scale), chapter 4's single-tween island-separation-without-a-literal-before-state (the same
+     technique as the intro's own beat 4), chapter 5's `EMPTY_RESULT` mini networks (aggregate-only
+     step data, no per-bus detail at intermediate restoration states), and the portrait-layout gap
+     above.
+   - Parent portfolio directive's doc-file list (README/ARCHITECTURE/VISUAL_DESIGN/MOTION_SYSTEM/
+     DATA_SOURCES/TESTING/LIMITATIONS/DEPLOYMENT.md) -- check which exist already vs. still need
+     writing; none of this session's work touched them, so assume they need a pass reflecting
+     everything built across chapters 1-6.
+   - Portfolio case-study integration and final acceptance report, per the directive's own closing
+     steps -- the literal last items, after everything above is genuinely evidenced, not claimed.
+
+**Do not claim performance compliance, requirement completion, or final acceptance without the actual
+evidence each item above requires. Do not deploy or publish externally without explicit authorization.**
 
 **Shared work still unbuilt, tracked here rather than silently dropped:** a mobile bottom-sheet pattern
 for controls (chapters 2/3/5/6 all need one per ART_DIRECTION.md's responsive table; none exists yet).

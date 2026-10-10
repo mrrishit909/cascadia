@@ -30,6 +30,7 @@ import { Chapter3Scene } from '../scenes/Chapter3Scene'
 import { CorridorStrip, computeBaselineRails } from '../scenes/CorridorStrip'
 import { Chapter4Scene } from '../scenes/Chapter4Scene'
 import { Chapter5Comparison } from '../scenes/Chapter5Comparison'
+import { Chapter6Scene } from '../scenes/Chapter6Scene'
 import type { Precomputed, SolveResult } from '../engine/types'
 import '../scenes/experience.css'
 
@@ -233,6 +234,7 @@ export function Scene() {
           <CompareRestoration placement="lab" />
         </div>
       </section>
+      <Chapter6Scene stageRef={stageRef} active={active} solving={state.solve === 'solving' || state.restoration.status === 'loading'} />
 
       <p className="provenance">{state.result.label}</p>
     </main>
