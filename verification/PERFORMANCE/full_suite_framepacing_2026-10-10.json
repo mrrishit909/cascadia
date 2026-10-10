@@ -1,0 +1,128 @@
+{
+  "generatedAt": "2026-10-10T05:27:50.060Z",
+  "buildType": "production (npm run build && npm run preview)",
+  "results": [
+    {
+      "label": "idle-baseline-desktop",
+      "viewport": "1440x900",
+      "throttle": 1,
+      "sampleCount": 176,
+      "p50Ms": 16.7,
+      "p95Ms": 17.3,
+      "maxMs": 17.9,
+      "killCriterionMs": 16.7,
+      "pass": false
+    },
+    {
+      "label": "forward-scroll-full-journey-desktop",
+      "viewport": "1440x900",
+      "throttle": 1,
+      "sampleCount": 236,
+      "p50Ms": 16.7,
+      "p95Ms": 17.3,
+      "maxMs": 18,
+      "killCriterionMs": 16.7,
+      "pass": false
+    },
+    {
+      "label": "reverse-scroll-full-journey-desktop",
+      "viewport": "1440x900",
+      "throttle": 1,
+      "sampleCount": 236,
+      "p50Ms": 16.6,
+      "p95Ms": 17.5,
+      "maxMs": 18.5,
+      "killCriterionMs": 16.7,
+      "pass": false
+    },
+    {
+      "label": "rapid-navigation-desktop",
+      "viewport": "1440x900",
+      "throttle": 1,
+      "sampleCount": 176,
+      "p50Ms": 16.7,
+      "p95Ms": 17.4,
+      "maxMs": 18.5,
+      "killCriterionMs": 16.7,
+      "pass": false
+    },
+    {
+      "label": "ch3-corridor-morph-integrated-desktop",
+      "viewport": "1440x900",
+      "throttle": 1,
+      "sampleCount": 176,
+      "p50Ms": 16.6,
+      "p95Ms": 17.7,
+      "maxMs": 18.3,
+      "killCriterionMs": 16.7,
+      "pass": false
+    },
+    {
+      "label": "ch3-corridor-morph-integrated-mobile-4x",
+      "viewport": "390x844",
+      "throttle": 4,
+      "sampleCount": 176,
+      "p50Ms": 16.7,
+      "p95Ms": 18,
+      "maxMs": 21.4,
+      "killCriterionMs": 33.3,
+      "pass": true
+    },
+    {
+      "label": "ch4-fracture-tween-desktop",
+      "viewport": "1440x900",
+      "throttle": 1,
+      "sampleCount": 56,
+      "p50Ms": 16.7,
+      "p95Ms": 17.4,
+      "maxMs": 17.9,
+      "killCriterionMs": 16.7,
+      "pass": false
+    },
+    {
+      "label": "ch4-fracture-tween-mobile-4x",
+      "viewport": "390x844",
+      "throttle": 4,
+      "sampleCount": 56,
+      "p50Ms": 16.7,
+      "p95Ms": 17.6,
+      "maxMs": 17.9,
+      "killCriterionMs": 33.3,
+      "pass": true
+    },
+    {
+      "label": "ch6-solving-feedback-desktop",
+      "viewport": "1440x900",
+      "throttle": 1,
+      "sampleCount": 68,
+      "p50Ms": 16.7,
+      "p95Ms": 17.3,
+      "maxMs": 17.5,
+      "killCriterionMs": 16.7,
+      "pass": false
+    },
+    {
+      "label": "ch6-solving-feedback-mobile-4x",
+      "viewport": "390x844",
+      "throttle": 4,
+      "sampleCount": 68,
+      "p50Ms": 16.8,
+      "p95Ms": 17.6,
+      "maxMs": 25.4,
+      "killCriterionMs": 33.3,
+      "pass": true
+    },
+    {
+      "label": "live-solver-during-ch4-motion-desktop",
+      "viewport": "1440x900",
+      "throttle": 1,
+      "sampleCount": 56,
+      "p50Ms": 16.7,
+      "p95Ms": 17.6,
+      "maxMs": 19.3,
+      "killCriterionMs": 16.7,
+      "pass": false
+    }
+  ],
+  "allPass": false
+}
