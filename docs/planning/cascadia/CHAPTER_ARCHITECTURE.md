@@ -45,20 +45,40 @@ selection, and the glow filter driven by live solver state. That instance persis
 mounted, changes only via transform/camera, never remounts) across the intro and all 6 chapters,
 including chapter 6's laboratory.
 
-Chapter 3's locator inset and chapter 5's mini networks are a **separate, non-interactive presentational
-variant** of the same renderer: no `role="button"`, no `tabIndex`, no `data-testid="bus"`/`"line"`
-(use a different testid prefix, e.g. `data-testid="mini-bus"`), reduced DOM (no focus-ring elements, no
-selection-bracket elements -- those only make sense on the one keyboard-navigable stage). This is a
-real constraint, not a shortcut: without it, every `[data-testid="bus"][data-bus="26"]` locator used
-throughout the existing e2e suite would multi-match the instant chapter 3 or chapter 5 renders, and a
-keyboard user tabbing through the page would hit up to 4 non-interactive copies of the network before
-reaching anything useful.
+**Correction (advisor review, before chapter 3 was built): chapter 3's locator inset is NOT the
+non-interactive variant.** `docs/ART_DIRECTION.md`'s own camera section says the inset "acts as a small
+roving-tabindex network" for reaching any line not already shown as one of the 4 fixed corridor rails --
+that is explicitly interactive, keyboard-navigable behavior, which the non-interactive `interactive=false`
+variant cannot provide (it strips exactly those affordances). The original resolution below conflated
+"small" with "non-interactive"; those are independent. The fix:
+- **Chapter 3's locator inset IS the one persistent, interactive stage**, shown small and under a camera
+  transform (zoomed/panned to frame the whole network at 20% width), not a second renderer. Selecting a
+  line in the inset is the same `onSelectLine` the full-size stage uses everywhere else -- there is
+  genuinely only one stage element in the DOM at any time, consistent with the "never torn down and
+  replaced" rule, just displayed small in this chapter.
+- **Chapter 3's corridor-strip rails are a separate, NEW presentational form** (straight horizontal bars
+  with a flow magnitude and a rating tick), not a second network rendering at all -- they don't reuse
+  `NetworkView`'s bus/line glyphs, so they were never actually part of this "one stage" question. Build
+  them as their own small component reading the same `result`/`network` data, not as a NetworkView prop.
+- **Chapter 5's three mini networks remain the ONLY actual use of `interactive={false}`** -- small
+  multiples compared side by side have no meaningful "the one focused element" the way chapter 3's inset
+  (which IS the real stage, just small) does, and `docs/ART_DIRECTION.md` never claims they're
+  keyboard-navigable the way the inset is.
 
-**Implementation note for whoever builds this:** `NetworkView.tsx` likely needs an `interactive: boolean`
-(default true) prop that, when false, strips the `role`/`tabIndex`/testid/focus-ring/selection-bracket
-treatment from every bus and line, while keeping the exact same `lineVisual`/color/glow logic (so the
-mini renders use the identical, already-independently-reviewed encoding, not a hand-rolled second copy
-of it that could drift).
+Chapter 5's mini networks are a **separate, non-interactive presentational variant** of the same
+renderer: no `role="button"`, no `tabIndex`, no `data-testid="bus"`/`"line"` (use a different testid
+prefix, `data-testid="mini-bus"`/`"mini-line"`), reduced DOM (no focus-ring elements, no selection-bracket
+elements). This is a real constraint, not a shortcut: without it, every `[data-testid="bus"][data-bus="26"]`
+locator used throughout the existing e2e suite would multi-match the instant chapter 5 renders, and a
+keyboard user tabbing through the page would hit 3 non-interactive copies of the network before reaching
+anything useful.
+
+**Implemented:** `NetworkView.tsx`'s `interactive: boolean` (default true) prop, when false, strips the
+`role`/`tabIndex`/testid/focus-ring/selection-bracket treatment from every bus and line, while keeping
+the exact same `lineVisual`/color/glow logic (so chapter 5's minis use the identical,
+already-independently-reviewed encoding, not a hand-rolled second copy of it that could drift). Chapter 3
+uses the SAME `NetworkView` instance as every other chapter, `interactive` always `true`, with a new
+`viewBox`/camera prop controlling what portion is framed and at what scale.
 
 ## 3. Resolved: what the stage shows in chapters 2-5 while live controls are also present
 

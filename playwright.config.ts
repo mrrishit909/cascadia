@@ -15,5 +15,13 @@ export default defineConfig({
   },
   use: {
     baseURL: "http://localhost:4173",
+    // Chapter shell: `docs/ART_DIRECTION.md`'s reduced-motion rule loads the intro's FINAL frame
+    // directly (no 12s beat sequence) and swaps every chapter transition instantly. Defaulting every
+    // test to this is deliberate, not a weakened suite: without it, every existing test that goes
+    // straight to a control (e.g. `page.goto("/")` then immediately selecting a bus) would race a
+    // multi-second intro animation that has nothing to do with what it's testing. Motion-specific specs
+    // that need to exercise the real GSAP timelines opt OUT explicitly with
+    // `test.use({ reducedMotion: "no-preference" })` at the top of that file.
+    reducedMotion: "reduce",
   },
 });
