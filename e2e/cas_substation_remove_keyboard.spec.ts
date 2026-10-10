@@ -16,10 +16,17 @@ test("remove a substation by keyboard; unserved MW equals sweep total_shed", asy
   const expected = `${c.total_shed.toFixed(2)} MW`; // UI formats with toFixed(2)
 
   await page.goto("/");
-  // Tab to the SVG bus control for this bus, then Enter selects it for removal.
+  // Chapter-shell roving tabindex (e2e/networkRovingTabindex.spec.ts has the dedicated Arrow-key
+  // coverage for the mechanism itself): only ONE bus/line is ever a Tab stop now, so Tabbing up to 200
+  // times to reach an ARBITRARY bus (this test's target is picked dynamically from sweep data, not a
+  // fixed id near the default roving position) is no longer the right tool -- the same `.focus()`
+  // instrumentation already used throughout this suite's other "keyboard-only" tests (e.g.
+  // concurrency.spec.ts, addLine.spec.ts) to reach a starting element is used here too; the real
+  // keyboard interaction this test verifies is everything AFTER focus lands (Enter to select, Tab/Enter
+  // to confirm), unchanged.
   const target = page.locator(`[data-testid="bus"][data-bus="${bus}"]`);
   await expect(target).toBeVisible();
-  for (let i = 0; i < 200 && !(await target.evaluate(el => el === document.activeElement)); i++) await page.keyboard.press("Tab");
+  await target.focus();
   await expect(target).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(target).toHaveAttribute("aria-pressed", "true");

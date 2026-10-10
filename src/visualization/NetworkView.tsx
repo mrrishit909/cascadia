@@ -1,8 +1,18 @@
-import { useId, useMemo } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import type { CandidateLine } from '../engine/dcopf'
 import type { Case30, SolveResult } from '../engine/types'
 
 const W = 960, H = 640, PAD = 40
+// Portrait target box: ART_DIRECTION.md handoff item 7 requires a separate, hand-computed portrait
+// layout for chapters 1 and 6 at tablet/mobile widths, "not scaled down from landscape". A plain
+// viewBox crop of the landscape layout would just show a thin vertical slice of a wide network; instead
+// `project(network, { portrait: true })` rotates the raw pandapower geodata 90 degrees before fitting
+// to this portrait-shaped box, producing a genuinely different composition (tall structure, not a
+// squeezed wide one) from the same underlying point cloud -- computed once, frozen, versioned with the
+// fixture, same as the landscape layout.
+const PORTRAIT_W = 640, PORTRAIT_H = 960
+
+export interface Camera { x: number; y: number; w: number; h: number }
 
 // DESIGN_SYSTEM.json color tokens. Every stroke in this file must come from here, never a
 // hand-picked hex -- that ad hoc drift (fault red reused for "at limit"/"removed", a fourth
@@ -20,11 +30,17 @@ const INK = '#080D13'
 // Layout: pandapower's schematic geodata for case30 (hand-drawn by the case
 // authors to be planar-ish), uniformly scaled to fit, y flipped for SVG.
 // ponytail: no force relaxation; add if removed-bus/new-line views need it.
-function project(network: Case30) {
-  const xs = network.buses.map(b => b.x), ys = network.buses.map(b => b.y)
+// `portrait`: rotates the raw (x,y) point cloud 90 degrees before fitting to a portrait-shaped target
+// box (PORTRAIT_W x PORTRAIT_H), instead of fitting the unrotated cloud into a landscape box -- a real,
+// different composition computed from the same source data, not a CSS-level rescale of the landscape
+// layout.
+function project(network: Case30, portrait = false) {
+  const rawXs = network.buses.map(b => b.x), rawYs = network.buses.map(b => b.y)
+  const [xs, ys] = portrait ? [rawYs, rawXs] : [rawXs, rawYs] // 90-degree rotation: swap axes
+  const boxW = portrait ? PORTRAIT_W : W, boxH = portrait ? PORTRAIT_H : H
   const x0 = Math.min(...xs), y0 = Math.min(...ys)
-  const k = Math.min((W - 2 * PAD) / (Math.max(...xs) - x0), (H - 2 * PAD) / (Math.max(...ys) - y0))
-  return network.buses.map(b => ({ x: PAD + (b.x - x0) * k, y: H - PAD - (b.y - y0) * k }))
+  const k = Math.min((boxW - 2 * PAD) / (Math.max(...xs) - x0), (boxH - 2 * PAD) / (Math.max(...ys) - y0))
+  return network.buses.map((_, i) => ({ x: PAD + (xs[i] - x0) * k, y: boxH - PAD - (ys[i] - y0) * k }))
 }
 
 // networkEncoding.energizedLine / lowFlowLine / bindingLine / deEnergizedLine, in one place so the
@@ -107,15 +123,93 @@ interface Props { network: Case30; result: SolveResult; removedBus?: number | nu
   // whole <svg> aria-hidden (decorative/informational only -- the one interactive stage is what AT
   // users navigate; duplicating the same announcements across up to 4 simultaneous instances would be
   // confusing noise, not help).
-  interactive?: boolean }
-export function NetworkView({ network, result, removedBus = null, selectedBus = null, onSelect, selectedLine = null, onSelectLine, alteredLines = [], disabledLines = [], onRestoreLine, candidates = [], addedLines = [], onToggleCandidate, interactive = true }: Props) {
+  interactive?: boolean
+  // Chapter shell: the stage persists across every chapter (CHAPTER_ARCHITECTURE.md section 2) and
+  // changes only via transform/camera, never remounts. `camera` sets the SVG viewBox sub-rect within
+  // the fixed W x H (or portrait PORTRAIT_W x PORTRAIT_H) coordinate space -- e.g. chapter 2 pans to
+  // frame cols 6-12 at a smaller scale. On-screen SIZE (how big the <svg> renders in the page, e.g.
+  // chapter 3's small locator inset) is a separate concern, controlled by the parent chapter's own CSS
+  // around this component, not by NetworkView. Defaults to the full extent (the whole network visible,
+  // today's only behavior).
+  camera?: Camera
+  // `docs/ART_DIRECTION.md` section 3's responsive compositions table: portrait layouts (tablet/mobile
+  // chapters 1 and 6) use a separately computed layout, not a scaled-down landscape one. Switches which
+  // `project()` box/rotation is used; the resulting coordinate space is PORTRAIT_W x PORTRAIT_H instead
+  // of W x H, so a `camera` passed alongside `orientation="portrait"` must be expressed in THAT space.
+  orientation?: 'landscape' | 'portrait' }
+export function NetworkView({ network, result, removedBus = null, selectedBus = null, onSelect, selectedLine = null, onSelectLine, alteredLines = [], disabledLines = [], onRestoreLine, candidates = [], addedLines = [], onToggleCandidate, interactive = true, camera, orientation = 'landscape' }: Props) {
   const reactId = useId()
+  const boxW = orientation === 'portrait' ? PORTRAIT_W : W
+  const boxH = orientation === 'portrait' ? PORTRAIT_H : H
+  const activeCamera = camera ?? { x: 0, y: 0, w: boxW, h: boxH }
   const testid = interactive ? 'line' : 'mini-line'
   const busTestid = interactive ? 'bus' : 'mini-bus'
   const candTestid = interactive ? 'candidate-line' : 'mini-candidate-line'
+
+  // docs/ART_DIRECTION.md section 1 ("Navigation") and DESIGN_SYSTEM.json's selectableElement.focusVisible
+  // both require roving-tabindex keyboard navigation on the stage: only ONE bus/line/candidate is a Tab
+  // stop at a time (everything else is tabIndex=-1), and Arrow keys move that single stop along topology
+  // neighbors -- a bus's incident lines, a line's two endpoint buses. Without this, Tabbing through the
+  // ~71-element network (30 buses + 41 lines) to reach one specific element is the ONLY way in, which is
+  // why e2e/cas_substation_remove_keyboard.spec.ts previously had to Tab up to 200 times to reach a bus;
+  // Arrow-key topology navigation is the real spec, not an optimization.
+  //
+  // `neighbors`: adjacency built once per network/candidates change, keyed by the same "kind:idx" string
+  // used for data-testid/ref lookups (`bus:N`, `line:N`, `cand:K`). `cursorByKey` is a ref (not state) so
+  // moving away from a bus and back resumes cycling through its incident lines where it left off, rather
+  // than always landing on the same first neighbor -- a plain "always neighbor[0]" rule would make lines
+  // 2+ of a higher-degree bus unreachable by repeated same-direction presses.
+  const neighbors = useMemo(() => {
+    const m = new Map<string, string[]>()
+    const addEdge = (a: string, b: string) => { if (!m.has(a)) m.set(a, []); m.get(a)!.push(b) }
+    for (const l of network.lines) {
+      const lk = `line:${l.idx}`, fb = `bus:${l.from_bus}`, tb = `bus:${l.to_bus}`
+      addEdge(lk, fb); addEdge(lk, tb); addEdge(fb, lk); addEdge(tb, lk)
+    }
+    candidates.forEach((cl, k) => {
+      const lk = `cand:${k}`, fb = `bus:${cl.from_bus}`, tb = `bus:${cl.to_bus}`
+      addEdge(lk, fb); addEdge(lk, tb); addEdge(fb, lk); addEdge(tb, lk)
+    })
+    return m
+  }, [network, candidates])
+  const [rovingKey, setRovingKey] = useState(() => `bus:${network.buses[0]?.idx ?? 0}`)
+  const cursorByKey = useRef(new Map<string, number>())
+  const elRefs = useRef(new Map<string, SVGGElement>())
+  const registerRef = (key: string) => (el: SVGGElement | null) => { if (el) elRefs.current.set(key, el); else elRefs.current.delete(key) }
+  const moveRoving = (dir: 1 | -1) => {
+    const ns = neighbors.get(rovingKey)
+    if (!ns || ns.length === 0) return
+    const cur = cursorByKey.current.get(rovingKey) ?? 0
+    const sel = ((cur % ns.length) + ns.length) % ns.length
+    cursorByKey.current.set(rovingKey, cur + dir)
+    setRovingKey(ns[sel])
+  }
+  // Only move REAL browser focus to the new roving element on a genuine change (arrow-key navigation or
+  // a click/programmatic focus syncing rovingKey via onFocus below) -- never on initial mount, which
+  // would otherwise steal page focus the instant the stage renders (same class of bug independent review
+  // found and fixed in LineOutage.tsx: an effect with no "did this actually change" guard fires once on
+  // every mount too, not just on later transitions).
+  const prevRovingKey = useRef(rovingKey)
+  useEffect(() => {
+    if (prevRovingKey.current === rovingKey) return
+    prevRovingKey.current = rovingKey
+    elRefs.current.get(rovingKey)?.focus()
+  }, [rovingKey])
   // Spread onto a <g> to add role/tabIndex/handlers/aria-pressed only when interactive; {} otherwise.
-  const hit = (ariaLabel: string, ariaPressed: boolean, onClick: () => void, onKeyDown: (e: React.KeyboardEvent) => void) =>
-    interactive ? { role: 'button' as const, tabIndex: 0, 'aria-pressed': ariaPressed, 'aria-label': ariaLabel, style: { cursor: 'pointer' }, onClick, onKeyDown } : {}
+  // `onFocus` keeps `rovingKey` in sync with whatever the browser ACTUALLY focused (a direct click, not
+  // just Arrow nav) -- without it, clicking a non-roving element would leave the DOM's real focus and
+  // this component's roving model disagreeing about which element is "current," and the next Arrow press
+  // would silently navigate from the wrong base element.
+  const hit = (key: string, ariaLabel: string, ariaPressed: boolean, onClick: () => void, onKeyDown: (e: React.KeyboardEvent) => void) =>
+    interactive ? {
+      role: 'button' as const, tabIndex: key === rovingKey ? 0 : -1, 'aria-pressed': ariaPressed, 'aria-label': ariaLabel,
+      style: { cursor: 'pointer' }, ref: registerRef(key), onClick, onFocus: () => setRovingKey(key),
+      onKeyDown: (e: React.KeyboardEvent) => {
+        onKeyDown(e)
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); moveRoving(1) }
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); moveRoving(-1) }
+      },
+    } : {}
   const keyToClick = (fn: () => void) => (e: React.KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fn() } }
   // D2: when infeasible, result.flows/shed/islands are all empty (there is no dispatch), so the old code
   // fell through to "no flow -> grey, not shed -> served", rendering a network that looks fully healthy.
@@ -123,7 +217,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
   // object standing in for "zero". See verification/NO_FAKE_NUMBERS_AUDIT.md #6 / PROTOTYPE_REPORT.md D2.
   const infeasible = result.status === 'infeasible'
   const noGen = useMemo(() => new Set(result.islands.filter(i => i.kind === 'shed_no_generation').flatMap(i => i.buses)), [result])
-  const pos = useMemo(() => project(network), [network])
+  const pos = useMemo(() => project(network, orientation === 'portrait'), [network, orientation])
   const flowVals = Object.values(result.flows).map(Math.abs)
   const maxFlow = Math.max(...(flowVals.length ? flowVals : [0]), 1)
 
@@ -173,14 +267,16 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
     // line), and role="img" tells assistive tech to treat the whole subtree as a flat, non-interactive
     // picture -- a real WCAG 4.1.2 violation (axe-core's "nested-interactive" rule, serious impact),
     // found by a dedicated a11y audit (e2e/a11y.spec.ts) rather than assumed fixed by the rest of this pass.
-    <svg viewBox={`0 0 ${W} ${H}`} role={interactive ? 'group' : undefined} aria-hidden={interactive ? undefined : true}
+    <svg viewBox={`${activeCamera.x} ${activeCamera.y} ${activeCamera.w} ${activeCamera.h}`} role={interactive ? 'group' : undefined} aria-hidden={interactive ? undefined : true}
       aria-label={interactive ? `IEEE case30 network, ${infeasible ? 'infeasible: no valid dispatch' : removedBus !== null ? `bus ${removedBus} removed` : 'baseline dispatch'}` : undefined}
       style={{ background: '#080D13', width: '100%', fontFamily: "'Archivo Variable','Arial Narrow','Roboto Condensed',system-ui,sans-serif" }}>
       <style>{`.nf-ring{opacity:0;pointer-events:none}g[tabindex]:focus-visible>.nf-ring{opacity:1}`}</style>
       <defs>
         {/* glow.filter: "copper-bloom", exact primitives from DESIGN_SYSTEM.json. Region bounded to
-            the network bbox plus 8px (glow.filter.filterUnits). Never applied to text/background/legend. */}
-        <filter id={filterId} x={-8} y={-8} width={W + 16} height={H + 16} filterUnits="userSpaceOnUse">
+            the FULL network bbox plus 8px regardless of the active camera (glow.filter.filterUnits) --
+            the filter region must cover every glow line that might be visible as the camera pans/zooms,
+            not just what's in view right now. */}
+        <filter id={filterId} x={-8} y={-8} width={boxW + 16} height={boxH + 16} filterUnits="userSpaceOnUse">
           <feGaussianBlur in="SourceGraphic" stdDeviation={2.5} result="blur" />
           <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 0.65 0 0 0  0 0 0.35 0 0  0 0 0 0.55 0" result="tint" />
           <feMerge>
@@ -205,14 +301,14 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           // so a line taken out via LineOutage can be put back from the SVG, not only its <select>.
           // networkEncoding.removedElement: deEnergized stroke, dash "1 3" -- fault red means ONLY infeasible.
           if (dead && outaged) return <g key={l.idx} data-testid={testid} data-line={l.idx} data-outaged="true"
-            {...hit(`Line ${l.idx}, out of service. Press Enter to restore.`, false, () => onRestoreLine?.(l.idx), keyToClick(() => onRestoreLine?.(l.idx)))}>
+            {...hit(`line:${l.idx}`, `Line ${l.idx}, out of service. Press Enter to restore.`, false, () => onRestoreLine?.(l.idx), keyToClick(() => onRestoreLine?.(l.idx)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={DE_ENERGIZED} strokeWidth={1} strokeDasharray="1 3" opacity={0.6} />
             {interactive && lineFocusRing(a.x, a.y, b.x, b.y, 0.5)}
           </g>
           if (dead) return <line key={l.idx} data-testid={testid} data-line={l.idx} x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={DE_ENERGIZED} strokeWidth={1} strokeDasharray="1 3" opacity={0.6} />
           if (infeasible) return <g key={l.idx} data-testid={testid} data-line={l.idx} data-binding="n/a" data-altered={alteredLines.includes(l.idx)}
-            {...hit(`Line ${l.idx}, flow n/a (infeasible). Press Enter to select for capacity.`, selectedLine === l.idx, () => onSelectLine?.(l.idx), keyToClick(() => onSelectLine?.(l.idx)))}>
+            {...hit(`line:${l.idx}`, `Line ${l.idx}, flow n/a (infeasible). Press Enter to select for capacity.`, selectedLine === l.idx, () => onSelectLine?.(l.idx), keyToClick(() => onSelectLine?.(l.idx)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={FAULT} strokeWidth={1.5} strokeDasharray="2 3" opacity={0.5} />
             {interactive && lineFocusRing(a.x, a.y, b.x, b.y, 0.75)}
@@ -228,7 +324,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           const width = 1 + 4 * f / maxFlow
           return <g key={l.idx} data-testid={testid} data-line={l.idx} data-binding={binding ? 'binding' : 'slack'}
             data-altered={alteredLines.includes(l.idx)}
-            {...hit(`Line ${l.idx}, ${binding ? 'binding' : 'slack'}, ${f.toFixed(2)} of ${rating.toFixed(2)} MW. Press Enter to select for capacity.`, sel, () => onSelectLine?.(l.idx), keyToClick(() => onSelectLine?.(l.idx)))}>
+            {...hit(`line:${l.idx}`, `Line ${l.idx}, ${binding ? 'binding' : 'slack'}, ${f.toFixed(2)} of ${rating.toFixed(2)} MW. Press Enter to select for capacity.`, sel, () => onSelectLine?.(l.idx), keyToClick(() => onSelectLine?.(l.idx)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             {/* networkEncoding.bindingLine: copperHot core with a copper casing either side (double rule) */}
             {v.casing && <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={v.casing} strokeWidth={width + 2} strokeLinecap="round" />}
@@ -248,13 +344,13 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           const a = pos[cl.from_bus], b = pos[cl.to_bus]
           const added = addedLines.includes(k)
           if (!added) return <g key={`cand-${k}`} data-testid={candTestid} data-candidate={k} data-added="false"
-            {...hit(`Candidate line ${k} (${network.buses[cl.from_bus].name}-${network.buses[cl.to_bus].name}), not added. Press Enter to add.`, false, () => onToggleCandidate?.(k), keyToClick(() => onToggleCandidate?.(k)))}>
+            {...hit(`cand:${k}`, `Candidate line ${k} (${network.buses[cl.from_bus].name}-${network.buses[cl.to_bus].name}), not added. Press Enter to add.`, false, () => onToggleCandidate?.(k), keyToClick(() => onToggleCandidate?.(k)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={DIAGNOSTIC_DIM} strokeWidth={1} strokeDasharray="6 4" opacity={0.35} />
             {interactive && lineFocusRing(a.x, a.y, b.x, b.y, 0.5)}
           </g>
           if (infeasible) return <g key={`cand-${k}`} data-testid={candTestid} data-candidate={k} data-added="true"
-            {...hit(`Candidate line ${k}, flow n/a (infeasible). Press Enter to remove.`, false, () => onToggleCandidate?.(k), keyToClick(() => onToggleCandidate?.(k)))}>
+            {...hit(`cand:${k}`, `Candidate line ${k}, flow n/a (infeasible). Press Enter to remove.`, false, () => onToggleCandidate?.(k), keyToClick(() => onToggleCandidate?.(k)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={FAULT} strokeWidth={1.5} strokeDasharray="2 3" opacity={0.5} />
             {interactive && lineFocusRing(a.x, a.y, b.x, b.y, 0.75)}
@@ -268,7 +364,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           const v = lineVisual(f, rating, binding, deEnergizedCand)
           const width = 1 + 4 * f / maxFlow
           return <g key={`cand-${k}`} data-testid={candTestid} data-candidate={k} data-added="true" data-binding={binding ? 'binding' : 'slack'}
-            {...hit(`Candidate line ${k} (added), ${binding ? 'binding' : 'slack'}, ${f.toFixed(2)} of ${rating.toFixed(2)} MW. Press Enter to remove.`, false, () => onToggleCandidate?.(k), keyToClick(() => onToggleCandidate?.(k)))}>
+            {...hit(`cand:${k}`, `Candidate line ${k} (added), ${binding ? 'binding' : 'slack'}, ${f.toFixed(2)} of ${rating.toFixed(2)} MW. Press Enter to remove.`, false, () => onToggleCandidate?.(k), keyToClick(() => onToggleCandidate?.(k)))}>
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={14} />
             {v.casing && <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={v.casing} strokeWidth={width + 2} strokeLinecap="round" />}
             <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={v.stroke} strokeWidth={width} strokeLinecap="round" strokeDasharray={v.dash} />
@@ -281,7 +377,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           const removed = b.idx === removedBus
           if (!removed && infeasible) {
             return <g key={b.idx} data-testid={busTestid} data-bus={b.idx} data-state="infeasible" transform={`translate(${pos[b.idx].x} ${pos[b.idx].y})`}
-              {...hit(`Bus ${b.name}, status n/a (infeasible). Press Enter to select for removal.`, selectedBus === b.idx, () => onSelect?.(b.idx), keyToClick(() => onSelect?.(b.idx)))}>
+              {...hit(`bus:${b.idx}`, `Bus ${b.name}, status n/a (infeasible). Press Enter to select for removal.`, selectedBus === b.idx, () => onSelect?.(b.idx), keyToClick(() => onSelect?.(b.idx)))}>
               <circle r={7} fill={INK} stroke={FAULT} strokeWidth={2} strokeDasharray="2 2" />
               {interactive && selectedBus === b.idx && busBrackets(`sel-${b.idx}`)}
               {interactive && busFocusRing()}
@@ -295,7 +391,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           const stroke = removed ? DE_ENERGIZED : state === 'served' ? COPPER : DIAGNOSTIC
           return (
             <g key={b.idx} data-testid={busTestid} data-bus={b.idx} data-state={state} transform={`translate(${pos[b.idx].x} ${pos[b.idx].y})`}
-              {...hit(`Bus ${b.name}, ${state.replace(/_/g, ' ')}. Press Enter to select for removal.`, selectedBus === b.idx, () => onSelect?.(b.idx), keyToClick(() => onSelect?.(b.idx)))}>
+              {...hit(`bus:${b.idx}`, `Bus ${b.name}, ${state.replace(/_/g, ' ')}. Press Enter to select for removal.`, selectedBus === b.idx, () => onSelect?.(b.idx), keyToClick(() => onSelect?.(b.idx)))}>
               <circle r={7} fill={isolated ? DIAGNOSTIC_DIM : INK} stroke={stroke} strokeWidth={2}
                 strokeDasharray={isolated ? '3 2' : undefined} />
               {removed && <path d="M-5-5L5 5M5-5L-5 5" stroke={stroke} strokeWidth={2} />}

@@ -1,0 +1,193 @@
+{
+ "base": {},
+ "case_id": "island_pocket_plus_line9",
+ "deterministic": true,
+ "down": [
+  {
+   "id": 36,
+   "kind": "line"
+  },
+  {
+   "id": 37,
+   "kind": "line"
+  },
+  {
+   "id": 9,
+   "kind": "line"
+  }
+ ],
+ "generator": "research/export/export_story_fixtures.py",
+ "id": "ch5_restoration_island_pocket_plus_line9",
+ "label": "SIMULATED: island-aware DC-OPF oracle output over a HYPOTHETICAL fault scenario (not observed data)",
+ "limitations": [
+  "DC approximation, lossless, no voltage/reactive limits",
+  "quadratic generator costs piecewise-linearised (4 segments)",
+  "VOLL=1000 EUR/MWh assumed",
+  "served_mw_steps assumes one equal time step per restoration action (no crew/duration data)"
+ ],
+ "meta": {
+  "chosen_on": "2026-10-09",
+  "down": [
+   {
+    "id": 36,
+    "kind": "line"
+   },
+   {
+    "id": 37,
+    "kind": "line"
+   },
+   {
+    "id": 9,
+    "kind": "line"
+   }
+  ],
+  "n_orders_total": 6,
+  "scenario": "CompareRestoration.tsx PRESETS[0] 'island_pocket_plus_line9': lines 36, 37, 9 down (3 elements), restored one at a time -- top 3 of its 6 enumerated restoration orders by served_mw_steps.",
+  "why": "ART_DIRECTION.md section 3's chapter 5 row calls for 'three equal columns (small multiples), one per restoration sequence from the fixture' -- read as one fault scenario's top-3 ranked restoration orders (not three different fault scenarios), matching reference R4's inspiration note ('several alternative states of ONE system drawn on the same base geometry'). island_pocket_plus_line9 is PRESETS[0], the control's own default, already pinned by e2e/compareRestoration.spec.ts."
+ },
+ "n_orders_total": 6,
+ "oracle": "research/models/oracle.py",
+ "ranking": [
+  {
+   "final_served_mw": 189.2,
+   "order": [
+    0,
+    1,
+    2
+   ],
+   "rank": 1,
+   "served_mw_steps": 554.5999999999999,
+   "steps": [
+    {
+     "restored": [],
+     "served_mw": 176.2,
+     "status": "optimal",
+     "step": 0,
+     "unserved_mw": 13.0
+    },
+    {
+     "restored": [
+      0
+     ],
+     "served_mw": 189.2,
+     "status": "optimal",
+     "step": 1,
+     "unserved_mw": 0.0
+    },
+    {
+     "restored": [
+      1
+     ],
+     "served_mw": 189.2,
+     "status": "optimal",
+     "step": 2,
+     "unserved_mw": 0.0
+    },
+    {
+     "restored": [
+      2
+     ],
+     "served_mw": 189.2,
+     "status": "optimal",
+     "step": 3,
+     "unserved_mw": 0.0
+    }
+   ]
+  },
+  {
+   "final_served_mw": 189.2,
+   "order": [
+    0,
+    2,
+    1
+   ],
+   "rank": 1,
+   "served_mw_steps": 554.5999999999999,
+   "steps": [
+    {
+     "restored": [],
+     "served_mw": 176.2,
+     "status": "optimal",
+     "step": 0,
+     "unserved_mw": 13.0
+    },
+    {
+     "restored": [
+      0
+     ],
+     "served_mw": 189.2,
+     "status": "optimal",
+     "step": 1,
+     "unserved_mw": 0.0
+    },
+    {
+     "restored": [
+      2
+     ],
+     "served_mw": 189.2,
+     "status": "optimal",
+     "step": 2,
+     "unserved_mw": 0.0
+    },
+    {
+     "restored": [
+      1
+     ],
+     "served_mw": 189.2,
+     "status": "optimal",
+     "step": 3,
+     "unserved_mw": 0.0
+    }
+   ]
+  },
+  {
+   "final_served_mw": 189.2,
+   "order": [
+    1,
+    0,
+    2
+   ],
+   "rank": 1,
+   "served_mw_steps": 554.5999999999999,
+   "steps": [
+    {
+     "restored": [],
+     "served_mw": 176.2,
+     "status": "optimal",
+     "step": 0,
+     "unserved_mw": 13.0
+    },
+    {
+     "restored": [
+      1
+     ],
+     "served_mw": 189.2,
+     "status": "optimal",
+     "step": 1,
+     "unserved_mw": 0.0
+    },
+    {
+     "restored": [
+      0
+     ],
+     "served_mw": 189.2,
+     "status": "optimal",
+     "step": 2,
+     "unserved_mw": 0.0
+    },
+    {
+     "restored": [
+      2
+     ],
+     "served_mw": 189.2,
+     "status": "optimal",
+     "step": 3,
+     "unserved_mw": 0.0
+    }
+   ]
+  }
+ ],
+ "seed": null,
+ "source_reference": "verification/REFERENCE_RESULTS/add_line_restoration.json",
+ "source_reference_sha256": "3d9f248634102450077832a917d8e7157e3ea8a38a63f636d867e67d4a625730"
+}

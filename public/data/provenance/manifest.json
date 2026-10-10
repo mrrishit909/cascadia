@@ -3,7 +3,10 @@
  "oracle_sha256": "df123bbcf730dccd18814451be6f9c415aabab72f752c3dbe704385d03f7373d",
  "files": {
   "precomputed/baseline.json": "d20aeeb0558dab777eb33af07e5bf1d4dd680dd30cc25603230eaaf9cb991ad8",
+  "precomputed/ch4_fault_bus26.json": "6064034a2f205e2dde2f4784e1346641b12755ec573db3fbabab713b51f2fe4d",
+  "precomputed/ch5_restoration_island_pocket_plus_line9.json": "8a30b69a419bdacc3d597e223d83ee2176514bbbcc144c48e34ed40e5d33a190",
   "precomputed/infeasible.json": "eb66753f99d19f57e5e7bc24d609a72e11f3538c737069c5d8479dfb2dff7ac2",
+  "precomputed/intro_fault_line33.json": "f490645157807cd62ed30dddea148d4037f2ac2ab57978d29ca2a1798291b7c8",
   "precomputed/islanding.json": "989b433bde44f6e0ad1d1ef69aea821579af2bb482c0614be2526e3085b6fa26",
   "raw-metadata/case30.json": "b24b03f5c37db70b685bf995c6ef233d02c7e5472f8e00ffca7e864f04014ff3",
   "scenarios/baseline.json": "3bc916d6b46be948375220b6f27eae42071a8d3d3c73633ee039906b86bc55d0",
