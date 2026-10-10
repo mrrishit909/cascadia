@@ -97,6 +97,65 @@ test("interrupted transition: leaving chapter 6 while a solve is still in flight
   await expect(page.locator(".stage-inner")).toHaveCSS("opacity", "1");
 });
 
+test.describe("layout: inspector rail is opaque and never scrolls loose over the network", () => {
+  // REGRESSION for an independent-review P1: chapter 6 shipped with zero ch6-specific CSS, so its 7
+  // full-size control cards sat in normal document flow at the section's own left edge, transparent,
+  // and scrolled up over the full-bleed sticky network's own drawn graph for the section's entire
+  // length, at every breakpoint. At DESKTOP, ART_DIRECTION.md's own row 6 literally specifies "a
+  // fixed 384px inspector rail on the right" OVER the full-bleed network (the "immersive canvas with
+  // anchored inspector" archetype) -- so the rail legitimately covering part of the drawn graph there
+  // is correct, by design, not a regression; what the fix must guarantee instead is that the rail is
+  // opaque (so covered content doesn't visually bleed through, unlike the original transparent cards)
+  // and anchored (sticky/fixed, not loose in document flow). At TABLET/MOBILE the spec's own responsive
+  // table has no such overlay allowance, so the stacked-below layout there must have zero overlap with
+  // the network, checked against a real bus element's measured position.
+  test("desktop: the rail is opaque and anchored, not a loose transparent card", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    await page.getByRole("link", { name: "FIG. 06" }).click();
+    await page.waitForFunction(() => document.querySelector(".stage-sticky")?.getAttribute("data-active-chapter") === "ch6");
+    await page.waitForTimeout(300);
+    const rail = page.locator("#ch6 .chapter-controls-column");
+    await expect(rail).toHaveCSS("position", "sticky");
+    const bg = await rail.evaluate(el => getComputedStyle(el).backgroundColor);
+    expect(bg).not.toBe("rgba(0, 0, 0, 0)"); // opaque, not the default transparent
+    const box = await rail.boundingBox();
+    expect(box).not.toBeNull();
+    if (box) expect(box.x + box.width).toBeLessThanOrEqual(1440); // stays within the viewport, doesn't run off-page
+  });
+
+  for (const [name, viewport] of [
+    ["tablet", { width: 768, height: 1024 }],
+    ["mobile", { width: 390, height: 844 }],
+  ] as const) {
+    test(`${name}: no network bus renders underneath the controls column`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto("/");
+      // Direct FIG-index navigation (the same realistic path the independent review itself used to
+      // reproduce this defect), not scrollToChapter's scrollIntoViewIfNeeded: on this unusually tall
+      // section (100vh+ of padding-top at narrow widths), scrollIntoViewIfNeeded's default "nearest
+      // edge" alignment lands mid-section rather than at a real scroll-settled position, which is an
+      // artifact of that navigation method, not a real user-reachable state.
+      await page.getByRole("link", { name: "FIG. 06" }).click();
+      await page.waitForFunction(() => document.querySelector(".stage-sticky")?.getAttribute("data-active-chapter") === "ch6");
+      await page.waitForTimeout(300);
+      const controlsBox = await page.locator("#ch6 .chapter-controls-column").boundingBox();
+      expect(controlsBox).not.toBeNull();
+      if (!controlsBox) return;
+      const buses = page.locator('[data-testid="bus"]');
+      const count = await buses.count();
+      expect(count).toBeGreaterThan(0);
+      for (let i = 0; i < count; i++) {
+        const busBox = await buses.nth(i).boundingBox();
+        if (!busBox) continue;
+        const overlapX = Math.max(0, Math.min(busBox.x + busBox.width, controlsBox.x + controlsBox.width) - Math.max(busBox.x, controlsBox.x));
+        const overlapY = Math.max(0, Math.min(busBox.y + busBox.height, controlsBox.y + controlsBox.height) - Math.max(busBox.y, controlsBox.y));
+        expect(overlapX * overlapY).toBe(0);
+      }
+    });
+  }
+});
+
 test("analytical state preservation: scrolling into and out of chapter 6 alone never creates an extra Worker", async ({ page }) => {
   await page.addInitScript(() => {
     (window as unknown as { __workerCount: number }).__workerCount = 0;

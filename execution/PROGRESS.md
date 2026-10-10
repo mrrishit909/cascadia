@@ -1033,12 +1033,52 @@ deploy (not authorized) but now notes the production build and `LIMITATIONS.md` 
 **Shared work still unbuilt, tracked here rather than silently dropped:** a mobile bottom-sheet pattern
 for controls (chapters 2/3/5/6 all need one per ART_DIRECTION.md's responsive table; none exists yet).
 
+**Independent review findings and remediation (phase 2, complete):** the review (isolated worktree,
+no access to this file) found 4 items:
+
+1. **[P1, FIXED]** Chapter 6's inspector rail had zero ch6-specific CSS: its 7 control cards sat in
+   normal document flow, transparent, scrolling up over the full-bleed sticky network for the whole
+   section at every breakpoint. Fixed in `experience.css` with a right-anchored rail at desktop
+   (opaque background, its own internal scroll) and a stacked-below layout at tablet/mobile, matching
+   ART_DIRECTION.md row 6 ("immersive canvas with anchored inspector") literally. **First attempt used
+   `position: fixed`, which was itself a real regression**, found only by re-running the FULL suite
+   (not just chapter 6's own tests) after the fix: a fixed descendant positions against the real
+   browser viewport unless an ancestor establishes a containing block, so the rail rendered pinned on
+   top of the ENTIRE page at every scroll position, intercepting clicks meant for chapters 1-5's own
+   'home' controls (8 unrelated e2e tests failed: addLine, concurrency, dualMount, newControls -- all
+   passed on a clean `git stash` of the same commit, confirming causation before the second fix).
+   Corrected to `position: sticky` + `align-self: flex-end` within ch6's own flex-column section,
+   which stays correctly bounded to that section. Visually reverified via real (non-fullPage)
+   screenshots at all 3 required breakpoints after EACH attempt, and a regression test added
+   (`e2e/chapter6.spec.ts`, "layout" describe block: desktop checks the rail is opaque/anchored per
+   the spec's own intentional-overlay design, tablet/mobile check zero overlap with real bus elements,
+   matching ART_DIRECTION.md's own responsive table which has no overlay allowance there).
+2. **[test bug, FIXED]** `e2e/compareRestoration.spec.ts`'s isolation test asserted on the shared-stage
+   `data-bus="26"` attribute without first navigating to chapter 4 (RemoveNode's own 'home' placement),
+   per `CHAPTER_ARCHITECTURE.md` section 3's rule that the stage only shows a control's live effect
+   while that control's own chapter is active. The underlying app behavior was already correct --
+   fixed by adding `scrollToChapter(page, "ch4")` before the assertion, the same pattern already used
+   everywhere else.
+3. **[P2, DOCUMENTED not fixed]** Intro title overlaps network glyphs at one specific desktop scroll
+   position under reduced motion (two other apparent overlaps the review flagged, tablet ch2 and
+   desktop ch4, were investigated and found to be scroll-test artifacts, not real bugs). Recorded in
+   `LIMITATIONS.md` rather than fixed this pass: brief, reduced-motion-only, one-breakpoint, not a
+   functional defect, and the two structural P1s above took priority.
+4. **[stale, already resolved]** Missing docs/stale `REQUIREMENTS.yaml` -- this finding predates the
+   documentation commits made earlier in finalization (the review's worktree was checked out before
+   those commits existed). No action needed.
+
+**Full suite re-run fresh after remediation**: `npx tsc --noEmit` clean, Vitest 61/61, pytest 32/32,
+Playwright 115/115 (one `compareRestoration.spec.ts` flake under parallel workers reproduced as a
+resource-contention artifact, not a real failure -- confirmed green across 3 repeats with
+`--workers=1`). Production build clean.
+
 ## Resume point: finalization in progress
 
 Check `git log --oneline -15` for the most recent commit. All 6 chapters are built and committed.
-Finalization phases 1 (performance) and 3 (documentation) are committed. Phase 2 (independent review) is
-IN PROGRESS as of this update -- check for its findings before continuing to phase 4 (final integration
-gate) or phase 5 (the final acceptance report, `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`, not
-yet created). Do not write that report, and do not declare CASCADIA accepted, until the independent
-review's findings are in hand, any P0/P1 defects are fixed and reverified, and the full suite has been
-re-run fresh one more time afterward.
+Finalization phases 1 (performance), 2 (independent review + remediation), and 3 (documentation) are
+now complete and committed. Remaining: phase 4 (final integration gate: fresh runs of everything one
+more time, oracle parity, responsive screenshots, integrated frame-pacing, concurrency/reset
+regressions) and phase 5 (the final acceptance report, `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`,
+not yet created, plus `CASCADIA_FINAL_HANDOFF.md` per the accelerated-finalization directive). Do not
+write either report, and do not declare CASCADIA accepted, until phase 4's fresh evidence is in hand.

@@ -1,7 +1,7 @@
 // e2e coverage for CAS-INT-006 (compare restoration) against the real production build/Worker.
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { controlHome, home } from "./helpers/placement";
+import { controlHome, home, scrollToChapter } from "./helpers/placement";
 
 async function withWasmDelay(page: Page, ms: number) {
   await page.route("**/*.wasm", async (route) => {
@@ -51,6 +51,11 @@ test("isolation: Compare's own request does not hang an unrelated control's in-f
   // `pending`, that control would be stuck showing "Solving..." forever, with no error and no result.
   await withWasmDelay(page, 1500);
   await page.goto("/");
+  // RemoveNode's own 'home' placement lives in chapter 4 (App.tsx): the shared stage only shows a
+  // control's live effect while that control's own chapter is active (CHAPTER_ARCHITECTURE.md section
+  // 3), so navigate there first, the same way a real user scrolling to the control would, before
+  // asserting on the shared-stage bus element (an independent review flagged this as stale/missing).
+  await scrollToChapter(page, "ch4");
   await page.locator('[data-testid="bus"][data-bus="26"]').focus(); // NetworkView stage, not a dual-mounted control
   await page.keyboard.press("Enter");
   await home(page).getByRole("button", { name: "Confirm removal" }).focus();

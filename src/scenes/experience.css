@@ -116,7 +116,48 @@
 #ch4.chapter-section { align-items: flex-end; }
 #ch4.chapter-section > * { width: 100%; max-width: 420px; }
 @media (max-width: 1023px) { #ch4.chapter-section { align-items: stretch; } #ch4.chapter-section > * { max-width: none; } }
-.chapter-prose { max-width: 62ch; }
+
+/* Chapter 6 ("Scenario laboratory", immersive canvas + anchored inspector rail, ART_DIRECTION.md
+   section 3): shipped with ZERO ch6-specific CSS -- its 7 full-size control cards sat in normal
+   document flow at the section's own left edge, ~1980px tall, scrolling up and over the full-bleed
+   sticky network behind them for the section's entire length at every breakpoint. Found by an
+   independent review's own real screenshots at all 3 breakpoints, not caught by any assertion-based
+   test (axe-core found 0 violations on the same page -- this is a pure visual-composition defect).
+   Fixed to match the spec literally: a 384px rail, pinned to the viewport while this chapter is in
+   view with its OWN internal scroll for its 7 cards, at desktop; stacked below the network (not
+   pinned) at tablet/mobile, reusing the same "clear the sticky network's own footprint" technique
+   already proven for chapters 2/4.
+   First attempt used `position: fixed`, which was a real regression, found by re-running the FULL
+   suite (not just chapter 6's own tests): a fixed descendant is positioned against the real browser
+   viewport unless some ANCESTOR establishes a containing block (a transform/filter/perspective/
+   contain, none of which `.chapter-section`'s own `position:relative` provides) -- so the rail
+   rendered pinned on top of the page at EVERY scroll position, including chapters 1-5, intercepting
+   clicks meant for their own 'home' controls (8 unrelated e2e tests failed: addLine, concurrency,
+   dualMount, newControls). `position: sticky` + `align-self: flex-end` (ch6's own `.chapter-section`
+   is the `display:flex;flex-direction:column` parent) gets the same "pinned to the viewport while
+   this chapter is in view, own internal scroll" behavior while staying correctly bounded to ch6's own
+   section as its sticky containing block, like every other chapter's existing stage-slot CSS. */
+#ch6 .chapter-controls-column {
+  position: sticky;
+  top: 0;
+  align-self: flex-end;
+  width: 384px;
+  max-width: 384px;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 10;
+  background: var(--surface);
+  border-left: var(--border-hairline);
+  padding: var(--sp-5);
+  margin: 0;
+}
+@media (max-width: 1023px) {
+  /* Unlike chapters 2/4, ch6's own network stays FULL-bleed (width:100%, no height:55vh strip --
+     it's the "immersive canvas" archetype, matching chapter 1's own narrow-width treatment) --
+     the clearance needed below it is the sticky stage's own full 100vh, not 55vh. */
+  #ch6.chapter-section { padding-top: calc(100vh + var(--sp-6)); }
+  #ch6 .chapter-controls-column { position: static; width: auto; max-width: none; height: auto; overflow-y: visible; border-left: none; border-top: var(--border-hairline); padding: var(--sp-5) 0 0; }
+}
 .chapter-controls-column { max-width: 420px; }
 
 /* Chapter 2's balance rule (ART_DIRECTION.md section 3): one rule, two states crossfaded by
