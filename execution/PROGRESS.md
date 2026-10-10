@@ -1100,15 +1100,31 @@ reproduce-before-fix requirement.
 pytest 32/32, Playwright 116/116 (single fresh run, no flakes this time). Production build clean.
 Both remediation commits are on `main`.
 
+**Third independent review (fresh worktree, verifying the two remediation commits above, not the
+original P1/P2 findings) found one more real defect, now fixed:** desktop (flush rail, opaque, no bus
+occlusion) and the intro title plate (opaque across a full scroll sweep) were both confirmed correct.
+But the `<1023px` reset for `#ch6 .chapter-controls-column` was missing 2 of 9 desktop-only properties
+(`align-self: flex-end`, a desktop-only negative `margin-right`) -- caught by a real scroll-THROUGH
+sweep (4 depths), not the single arrival-frame check the existing tests used. Left in place, this
+caused genuine horizontal overflow (864px content in a 768px tablet viewport, 518px in 390px mobile --
+clipping real control text/buttons) and a PERSISTENT overlay over the network for most of the rail's
+scroll length at tablet/mobile, where the spec requires clean stacking with zero overlap. Fixed by
+explicitly zeroing both missed properties; a scroll-sweep regression test added (confirmed red against
+the pre-fix CSS first, matching the reviewer's own overflow numbers almost exactly). The ~10px overflow
+measured at mobile turned out to be a pre-existing, unrelated FIG-index nav artifact also present on
+chapter 1 -- confirmed, not fixed (outside this task's scope), and the new test's tolerance accounts
+for it explicitly rather than silently passing through a looser bound.
+
+**Full suite re-run fresh after all THREE remediation passes**: `npx tsc --noEmit` clean, Vitest
+61/61, pytest 32/32, Playwright 118/118. All three remediation commits are on `main`.
+
 ## Resume point: finalization in progress
 
 Check `git log --oneline -15` for the most recent commit. All 6 chapters are built and committed.
-Finalization phases 1 (performance), 2 (independent review + two remediation passes), and 3
-(documentation) are now complete and committed. Remaining: phase 4 (final integration gate: fresh runs
-of everything one more time, oracle parity, responsive screenshots, integrated frame-pacing,
-concurrency/reset regressions, AND a fresh independent worktree review of the two remediation commits
-specifically -- a reviewer's own "is anything still under the rail or under a title at any breakpoint"
-check, not just this agent's own screenshots) and phase 5 (the final acceptance report,
-`verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`, not yet created, plus `CASCADIA_FINAL_HANDOFF.md`
-per the accelerated-finalization directive). Do not write either report, and do not declare CASCADIA
-accepted, until phase 4's fresh evidence -- INCLUDING that independent reverification -- is in hand.
+Finalization phases 1 (performance), 2 (independent review + three remediation passes, the last of
+which was itself independently reverified in a fresh worktree), and 3 (documentation) are now complete
+and committed. Remaining: phase 4 (final integration gate: fresh runs of everything one more time,
+oracle parity, responsive screenshots, integrated frame-pacing, concurrency/reset regressions) and
+phase 5 (the final acceptance report, `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`, not yet
+created, plus `CASCADIA_FINAL_HANDOFF.md` per the accelerated-finalization directive). Do not write
+either report, and do not declare CASCADIA accepted, until phase 4's fresh evidence is in hand.
