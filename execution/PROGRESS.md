@@ -238,8 +238,58 @@ in this file was real at time of review. Locator scoping (`home`/`controlHome`) 
   `verification/SCREENSHOTS/cas-int-001-keyboard-remove.png` -- expected, not a bug, but worth remembering
   when reviewing a diff that touches this file for no apparent reason.
 
+## Chapter shell skeleton landed (commit `4f7cf30`) -- static structure, no GSAP motion yet
+
+Per the user's "CINEMATIC EXPERIENCE IMPLEMENTATION" directive, following the advisor-reviewed
+two-pass plan (shell first, verified and committed; motion second, one chapter at a time):
+
+- **Persistent stage**: one `<NetworkView>`, `position: sticky` (`src/scenes/experience.css`), lives
+  outside every chapter's own content flow. Its on-screen slot is driven by CSS keyed on
+  `data-active-chapter`; its displayed data (story fixture vs. live result) by `chapterDivergence.ts`'s
+  per-chapter predicates (already built/tested in an earlier pass).
+- **Active-chapter detection**: `src/scenes/useActiveChapter.ts`, IntersectionObserver-based, UI-only
+  state (never `AppState`). Real bug found and fixed while building this: the effect ran once while
+  Scene's loading placeholder was showing (no chapter sections exist yet), found nothing, and never
+  retried once the real markup mounted due to a static dependency array -- would have stuck the active
+  chapter forever on EVERY real page load, not just in tests. Fixed with a MutationObserver fallback;
+  regression test `src/scenes/useActiveChapter.test.tsx`, mutation-checked.
+- **Chapter 4's story/lab ledger** (`src/scenes/Chapter4Ledger.tsx`): the advisor review's "not
+  deferrable" item is done -- shows `ch4_fault_bus26.json` until the user's own action diverges, then
+  switches to live with a visible STORY/YOUR SCENARIO label.
+- **Controls rehomed** to their real chapters (ch2/3/4/5 + ch6 lab with all 7, including AddLine which
+  is now correctly lab-only per DESIGN_SYSTEM.json's own `chapters` array -- the inconsistency flagged
+  in the prior update is resolved). `placement` is now a REQUIRED prop on all 7 controls.
+- Test migration found and fixed two more real things: the `home-controls` RTL wrapper's replacement
+  (`src/app/testHelpers.ts`'s `homeControl(label)`), and several existing e2e tests that had been
+  silently relying on accidental browser auto-scroll-on-focus to land on the right chapter -- fixed
+  properly with a real `scrollToChapter(page, id)` helper (`e2e/helpers/placement.ts`) and a
+  `MockIntersectionObserver`/`activateChapter` test-setup.ts helper for vitest, not papered over.
+
+Test counts as of `4f7cf30`: 39/39 vitest, 49/49 e2e (incl. axe-core), 32/32 pytest, clean build. Real
+screenshots at all 3 breakpoints: `verification/SCREENSHOTS/chapter-shell/`.
+
+**Known gap, not yet fixed:** `addedLines`/`candidates` are passed to the stage UNCONDITIONALLY from
+live state (not chapter-gated like `stageResult`/`stageRemovedBus`/etc.), since AddLine is lab-only and
+lab is always-live anyway -- harmless today, but means a candidate line added via the lab would show on
+EVERY chapter's stage, including chapter 1's baseline story, if a user later scrolled back up. Minor,
+flagged for whoever adds AddLine's own divergence predicate if this ever matters visually.
+
+## Next: GSAP motion, one chapter at a time (not yet started)
+
+Per the approved sequence: intro's 4-beat storyboard first (`docs/ART_DIRECTION.md` section 4's table,
+`intro_fault_line33.json` fixture already generated for beat 4), measure frame pacing on the production
+build against the kill criteria (section 4's table) before chapters 2-6, each with reduced-motion
+fallback built alongside (not after) since the skeleton's current state already IS the reduced-motion
+end state for every chapter (no motion exists yet to reduce). Remaining P2/P3 items from the independent
+review (visible status plate, chapterDivergence.test.ts going through the real reducer, LabStub-specific
+issues now moot since LabStub is gone, Worker termination on unmount) still tracked, land alongside
+chapter work. Portrait-specific NetworkView layouts exist (`orientation="portrait"` prop, camera support)
+but are not yet WIRED INTO the chapter shell's tablet/mobile CSS breakpoints -- next concrete gap once
+chapter 1's motion pass needs them.
+
 ## Resume point if this session ends mid-chapter-work
 
 Check `git log --oneline -10` for the most recent commit, and re-read this file plus
-`docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` by then. The independent review's GO/NO-GO gate has now
-passed (P1s fixed); chapter/GSAP work may begin, with the P2/P3 list above tracked alongside it.
+`docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` by then. The chapter shell skeleton (static layout,
+every control in its real chapter, persistent stage) is built and verified. GSAP/scroll motion has not
+started -- begin with the intro's 4-beat storyboard, per `docs/ART_DIRECTION.md` section 4.
