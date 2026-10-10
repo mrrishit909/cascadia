@@ -74,16 +74,12 @@ one is also noted inline, in the source file closest to the decision, at the tim
   FULL_SUITE_FRAMEPACING_REPORT.md` for the full reasoning and a recommendation to re-run the same
   measurement script on hardware with real display compositing if a definitive desktop number is
   required.
-- **Mobile LCP measures 2.567s against the release gate's <=2.5s target (Lighthouse, standard
-  throttled mobile simulation: 150ms RTT, ~1.6Mbps, 4x CPU slowdown).** A real, measured 67ms (2.7%)
-  miss, not rounded away. Desktop Lighthouse passes every gated metric (Performance 100, Accessibility
-  100, LCP 0.5s, CLS 0); mobile passes Performance (95), Accessibility (100), and CLS (0), missing only
-  this one sub-threshold. Investigated before being left unfixed: no render-blocking resource, no
-  unminified/unused CSS, no long critical request chain, and the LCP element's own breakdown attributes
-  under 103ms to the observed render path -- the simulated figure is dominated by the throttling
-  model's own round-trip-time simulation for this bundle's 235 KiB payload, not an identifiable
-  application inefficiency a quick fix could address. See `verification/PERFORMANCE/
-  LIGHTHOUSE_REPORT.md` for full detail.
+- Mobile LCP was measured once at 2.567s (over the release gate's <=2.5s target) before the app's
+  single CSS bundle was found to be genuinely render-blocking (Lighthouse's `render-blocking-insight`
+  audit, ~750ms estimated LCP savings) and fixed by inlining it into `index.html` at build time. Not a
+  current limitation -- kept here only as a pointer: see `verification/PERFORMANCE/
+  LIGHTHOUSE_REPORT.md` for the full before/after record, including the earlier incorrect "investigated,
+  no fix available" claim that an advisor review caught and this entry corrects.
 
 ## Testing tooling (not application gaps)
 
