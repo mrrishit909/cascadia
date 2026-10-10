@@ -143,10 +143,9 @@
    sticky network behind them for the section's entire length at every breakpoint. Found by an
    independent review's own real screenshots at all 3 breakpoints, not caught by any assertion-based
    test (axe-core found 0 violations on the same page -- this is a pure visual-composition defect).
-   Fixed to match the spec literally: a 384px rail, pinned to the viewport while this chapter is in
-   view with its OWN internal scroll for its 7 cards, at desktop; stacked below the network (not
-   pinned) at tablet/mobile, reusing the same "clear the sticky network's own footprint" technique
-   already proven for chapters 2/4.
+   Fixed to match the spec literally: a 384px rail, anchored to the viewport's right edge with its OWN
+   internal scroll for its 7 cards, at desktop; stacked below the network at tablet/mobile, reusing the
+   same "clear the sticky network's own footprint" technique already proven for chapters 2/4.
    First attempt used `position: fixed`, which was a real regression, found by re-running the FULL
    suite (not just chapter 6's own tests): a fixed descendant is positioned against the real browser
    viewport unless some ANCESTOR establishes a containing block (a transform/filter/perspective/
@@ -154,9 +153,14 @@
    rendered pinned on top of the page at EVERY scroll position, including chapters 1-5, intercepting
    clicks meant for their own 'home' controls (8 unrelated e2e tests failed: addLine, concurrency,
    dualMount, newControls). `position: sticky` + `align-self: flex-end` (ch6's own `.chapter-section`
-   is the `display:flex;flex-direction:column` parent) gets the same "pinned to the viewport while
-   this chapter is in view, own internal scroll" behavior while staying correctly bounded to ch6's own
-   section as its sticky containing block, like every other chapter's existing stage-slot CSS. */
+   is the `display:flex;flex-direction:column` parent) stays correctly bounded to ch6's own section as
+   its sticky containing block, like every other chapter's existing stage-slot CSS -- computed style
+   confirms `position:sticky` is applied (not overridden), but note the section's own vertical padding
+   leaves only a modest page-scroll range before the rail scrolls away with the rest of the page (NOT
+   "pinned for the chapter's entire scroll length" -- don't describe it that way in docs or reports).
+   The 7 cards' own internal reachability does NOT depend on that page-level pin: the rail's own
+   `height:100vh; overflow-y:auto` gives it a fixed-height internal scrollbar, confirmed all 7 controls
+   (including the 7th, CompareRestoration) are reachable via that internal scroll regardless. */
 #ch6 .chapter-controls-column {
   position: sticky;
   top: 0;
@@ -298,6 +302,10 @@
   text-decoration: none;
   padding: var(--sp-1) var(--sp-2);
   border-left: 2px solid transparent;
+  white-space: nowrap; /* at <1023px (row layout, see below) each link's own text ("FIG. 04") was
+    wrapping to 2 lines, making the real rendered bar taller than the fixed offset other chrome
+    (.skip-intro, .stage-sticky) assumed it was -- found via a real screenshot showing SKIP INTRO still
+    overlapping the second text line. One line + the row's own overflow-x:auto keeps bar height fixed. */
 }
 .fig-index a:hover { color: var(--text); }
 .fig-index a[aria-current="step"] { color: var(--copper); border-left-color: var(--copper); }
@@ -373,7 +381,28 @@
 }
 
 @media (max-width: 1023px) {
-  .fig-index { left: 0; top: 0; transform: none; flex-direction: row; width: 100%; padding: var(--sp-3) var(--sp-4); background: var(--surface); position: sticky; }
+  /* 7 links (INTRO + FIG.01-06) in a row don't fit 390px (or even 768px) of width at their natural
+     size -- the row was overflowing the viewport itself by ~10px, not just visually but as REAL
+     document width (`document.documentElement.scrollWidth`), which an anchor-jump click (e.g. the
+     FIG.06 index link, how every real user reaches a chapter directly) then auto-scrolled the whole
+     page horizontally to reveal -- found via `window.scrollX` after a real click, not assumed from a
+     static screenshot alone. `overflow-x:auto` contains that scroll to the strip itself instead of
+     the whole document. */
+  .fig-index { left: 0; top: 0; transform: none; flex-direction: row; flex-wrap: nowrap; width: 100%; max-width: 100vw; overflow-x: auto; padding: var(--sp-3) var(--sp-4); background: var(--surface); position: sticky; }
+  /* `.skip-intro` stays `position:fixed; top:24px; right:24px` (its desktop rule, above) at every
+     width -- at <1023px the FIG index becomes a full-width top bar (~44px tall, matching the
+     `.stage-sticky` offset just below) occupying that exact same top-right corner, so the two
+     literally overlapped (found via a real screenshot at 390x844: "SKIP INTRO" drawn directly over
+     "FIG. 04"/"FIG. 05"). Dropped below the bar instead of floating over it. */
+  /* `.skip-intro` is `position:fixed` (viewport-relative, doesn't move with scroll); `.fig-index` is
+     `position:sticky`, so at scrollY=0 it still sits in its own NORMAL flow position (pushed down by
+     `main`'s own responsive top padding, sp-6 32px at this breakpoint's widest) rather than already
+     pinned at the top -- a flat `44px` guess (calibrated for the PINNED state, after scrolling) was
+     too small at the actual unscrolled starting position. Measured directly (not re-guessed): fig-index
+     bar is a fixed 56px tall (one line, after the `white-space:nowrap` fix above) and its own worst-case
+     unscrolled top offset across this breakpoint's narrower sub-ranges is 32px (sp-6) -- 32+56=88px,
+     so 100px clears it with margin at every width in this range. */
+  .skip-intro { top: 100px; right: var(--sp-4); }
   .stage-sticky { top: 44px; height: calc(100vh - 44px); }
   .stage-sticky[data-active-chapter="ch2"] .stage-inner,
   .stage-sticky[data-active-chapter="ch4"] .stage-inner { width: 100%; margin: 0; height: 55vh; align-self: flex-start; }

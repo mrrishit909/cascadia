@@ -149,13 +149,18 @@ test.describe("intro title plate (reduced motion, default project setting)", () 
   // chapter 6's inspector rail), what must never happen again is the TEXT having no opaque backing,
   // so this checks the plate stays opaque and above the stage (z-index) across the same scroll sweep
   // that reproduced the original defect, not that it avoids the network's own bounding boxes.
-  test("the title plate stays opaque and above the stage across a natural scroll sweep", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
+  for (const [name, viewport] of [
+    ["desktop", { width: 1440, height: 900 }],
+    ["tablet", { width: 768, height: 1024 }],
+    ["mobile", { width: 390, height: 844 }],
+  ] as const) {
+  test(`${name}: the title plate stays opaque and above the stage across a natural scroll sweep`, async ({ page }) => {
+    await page.setViewportSize(viewport);
     await page.goto("/");
     const docHeight = await page.evaluate(() => document.body.scrollHeight);
     const plate = page.locator(".intro-title-plate");
     let sawPlate = false;
-    for (let y = 0; y < Math.min(docHeight, 2200); y += 200) {
+    for (let y = 0; y < Math.min(docHeight, 2200); y += 150) {
       await page.evaluate((yy) => window.scrollTo(0, yy), y);
       await page.waitForTimeout(80);
       const box = await plate.boundingBox();
@@ -165,7 +170,59 @@ test.describe("intro title plate (reduced motion, default project setting)", () 
       expect(bg).not.toBe("rgba(0, 0, 0, 0)"); // opaque, not the original transparent text-on-stage
       const z = await plate.evaluate(el => Number(getComputedStyle(el).zIndex));
       expect(z).toBeGreaterThanOrEqual(2); // above .stage-sticky's own z-index (1)
+      // Per a fresh independent reviewer's own check (verifying this fix, not just trusting it): the
+      // text itself must actually sit INSIDE the opaque plate's box, not merely be near an opaque box
+      // that happens to exist nearby -- this is what an opaque-but-wrongly-sized/positioned plate
+      // would fail that the bg/z-index checks alone would miss.
+      const h1Box = await page.locator(".intro-title-plate h1").boundingBox();
+      const pBox = await page.locator(".intro-title-plate .chapter-prose").boundingBox();
+      expect(h1Box).not.toBeNull();
+      expect(pBox).not.toBeNull();
+      if (h1Box) {
+        expect(h1Box.x).toBeGreaterThanOrEqual(box.x);
+        expect(h1Box.x + h1Box.width).toBeLessThanOrEqual(box.x + box.width + 1);
+      }
+      if (pBox) {
+        expect(pBox.x).toBeGreaterThanOrEqual(box.x);
+        expect(pBox.x + pBox.width).toBeLessThanOrEqual(box.x + box.width + 1);
+      }
     }
     expect(sawPlate).toBe(true); // the sweep actually passed through the intro section at least once
   });
+  }
+
+  // REGRESSION: a fresh independent review (verifying earlier fixes in this describe block, not just
+  // trusting them) found that `.skip-intro` stayed `position:fixed; top:24px` at every width, while
+  // `.fig-index` becomes a full-width top bar at <1023px occupying that same corner -- a real
+  // screenshot at 390x844 showed "SKIP INTRO" drawn directly over "FIG. 04"/"FIG. 05". A second,
+  // related defect in the same area: 7 nav links didn't fit 390px (or 768px) at natural size, causing
+  // real horizontal page overflow (`document.documentElement.scrollWidth` > viewport width) that an
+  // anchor-jump click then auto-scrolled the page to reveal. Fixed with `overflow-x:auto` + `white-
+  // space:nowrap` on `.fig-index` (contains the scroll to the strip, keeps it one line) and a
+  // corrected `.skip-intro` offset that clears the bar's real (not guessed) height.
+  for (const [name, viewport] of [
+    ["tablet", { width: 768, height: 1024 }],
+    ["mobile", { width: 390, height: 844 }],
+    ["mobile-360", { width: 360, height: 800 }],
+  ] as const) {
+    test(`${name}: SKIP INTRO never overlaps the FIG index, and the page never overflows horizontally`, async ({ page }) => {
+      await page.setViewportSize(viewport);
+      await page.goto("/");
+      await page.waitForTimeout(300);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+      const figBox = await page.locator(".fig-index").boundingBox();
+      const skipBox = await page.locator(".skip-intro").boundingBox();
+      expect(figBox).not.toBeNull();
+      expect(skipBox).not.toBeNull();
+      if (!figBox || !skipBox) return;
+      const overlapX = Math.max(0, Math.min(figBox.x + figBox.width, skipBox.x + skipBox.width) - Math.max(figBox.x, skipBox.x));
+      const overlapY = Math.max(0, Math.min(figBox.y + figBox.height, skipBox.y + skipBox.height) - Math.max(figBox.y, skipBox.y));
+      expect(overlapX * overlapY).toBe(0);
+      // real user navigation (an anchor-jump click) must not introduce horizontal scroll either
+      await page.getByRole("link", { name: "FIG. 06" }).click();
+      await page.waitForTimeout(300);
+      expect(await page.evaluate(() => window.scrollX)).toBe(0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+    });
+  }
 });
