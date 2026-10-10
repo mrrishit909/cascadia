@@ -91,6 +91,52 @@ commits `83d55a2`..`f521797`):
 
 Test counts as of commit `f521797`: 31/31 vitest, 47/47 e2e, 26/26 pytest, production build clean.
 
+**Locator migration landed** (commits `42e8f7e`, `ee3dc27`, `4b779fd` -- user-directed "CONTINUE FROM
+VERIFIED CHECKPOINT" directive):
+- All 7 controls gained `placement: 'home' | 'lab'` (default `'home'`), rendered as `data-placement` on
+  each control's root `<section>`. `e2e/helpers/placement.ts` added `home(page)`/`controlHome(page,
+  label)` for scoping; every control-internal e2e selector (testids, role queries, select/slider
+  lookups) migrated to use them. A real bug was found and fixed mid-migration: chaining
+  `home(page).locator('section:has-text(...) ...')` looks for a nested `<section>` inside the 7 already-
+  section-level home roots, which never exists -- caught immediately by a full-suite run (29/47 failed),
+  fixed with `controlHome()` (filters by text content first), re-verified 47/47.
+- **Real LineOutage dual-mount bug found and fixed** (`ee3dc27`): its focus-management effect had no
+  initial-mount guard, so mounting a second instance while a line was already selected (shared
+  `outageLine`) yanked keyboard focus to that instance's own trigger button on mount. Reproduced with a
+  failing vitest test first, then fixed with a `justMounted` ref guard.
+- **A REAL second placement is now permanently mounted** (`4b779fd`, `LabStub` in `App.tsx`): this is
+  the actual dual-placement gate proof the migration was missing until an advisor pass caught that the
+  prior two commits were never run against a genuine second mount. Surfaced two more real bugs
+  immediately: an axe-core `landmark-is-unique` violation (two identically-named `<section>` regions;
+  fixed with an sr-only " (laboratory)" heading suffix on the lab placement only) and 9 vitest unit tests
+  that broke outright once a second mount existed (fixed by scoping their queries through a `home()`
+  helper, mirroring the e2e pattern). `LabStub` is not a throwaway -- the real chapter 6 laboratory
+  replaces its shell (layout/heading/styling) but reuses its exact mount list.
+- **Not yet done, flagged by the same advisor pass, deliberately deferred (not blocking the shell
+  skeleton, but blocks calling the architecture gate passed):** `DESIGN_SYSTEM.json`'s
+  `componentStates.statusRegion` token specifies a VISIBLE status plate (colors/glyphs per state, RETRY/
+  UNDO LAST CHANGE actions, "last result held at 60% opacity" while solving) -- the `.sr-only`
+  `StatusRegion`/`RestorationStatusRegion` fix only satisfies the live-region/announcement requirement,
+  not this. The two are not in conflict: the sr-only regions stay exactly as committed (they're correct
+  for what they do), and a separate, visible, fixed-height plate near the legend still needs to be built
+  as its own shell deliverable so there's no CLS regression when it's added. `StatusRegion.tsx`'s "this
+  is it" doc comment overclaims until that plate exists.
+- **Also flagged, not yet resolved:** the design spec's `ariaLive` is `polite` for every state including
+  error/infeasible, but the current regions use `role="alert"` (assertive) for those -- pick one and
+  document why once the visible plate is built.
+
+Test counts as of commit `4b779fd`: 33/33 vitest, 47/47 e2e (incl. axe-core clean against the real
+dual-mount), 26/26 pytest, production build clean.
+
+**Known inconsistency, not yet resolved:** `LabStub` currently mounts `AddLine` with BOTH `placement=
+"home"` (in the `home-controls` div) and `placement="lab"` (in the lab section) -- i.e. today's app has
+a "home" AddLine that doesn't correspond to any real chapter, since `docs/ART_DIRECTION.md`'s own
+chapter table gives AddLine no home chapter at all (lab-only). This was mounted uniformly across all 7
+controls for simplicity while proving the dual-placement scoping infrastructure; it is NOT a claim that
+AddLine's home-chapter question is resolved (see `CHAPTER_ARCHITECTURE.md`'s still-open item on this).
+Whoever builds the real chapter shell should drop AddLine's "home" mount (or confirm the opposite) rather
+than copy this stub's mount list unchanged.
+
 ## Next: the 6 cinematic chapters (CAS-MOTION-001, the largest unstarted gate)
 
 Read `docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` FIRST (the story/lab boundary, the persistent-
