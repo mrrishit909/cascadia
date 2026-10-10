@@ -2,7 +2,7 @@
 // coverage until now). Uses a real touch-emulated context (hasTouch: true) at the mobile breakpoint
 // (390x844) and .tap() exclusively -- never .click() -- against the real production build/Worker.
 import { expect, test } from "@playwright/test";
-import { controlHome, home } from "./helpers/placement";
+import { controlHome, home, lab } from "./helpers/placement";
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -39,7 +39,7 @@ test("touch: alter line capacity via tap on the SVG then drag the slider", async
 
 test("touch: add a candidate line via tap on its own button", async ({ page }) => {
   await page.goto("/");
-  await home(page).getByRole("button", { name: "Add line 0" }).tap();
+  await lab(page).getByRole("button", { name: "Add line 0" }).tap(); // AddLine is lab-only (no home chapter)
   await expect.poll(() => page.locator('[data-testid="candidate-line"][data-candidate="0"]').getAttribute("data-added"), { timeout: 3000 }).toBe("true");
 });
 

@@ -5,7 +5,7 @@ import { ScenarioReadout } from './ScenarioReadout'
 // CAS-INT-004. Add a SYNTHETIC candidate line (candidate_lines.json, labeled not part of the real IEEE
 // case30 topology) -> real Worker solve (added_lines). Toggle directly from the SVG or this list.
 // No local draft to lift (addedLines is already shared AppState).
-export function AddLine({ placement = 'home' }: { placement?: 'home' | 'lab' } = {}) {
+export function AddLine({ placement }: { placement: 'home' | 'lab' }) {
   const { state, setAddedLine } = useApp()
   const { network, candidates, pending, addedLines, solve } = state
   const eff = pending?.addedLines ?? addedLines

@@ -1,0 +1,98 @@
+/* Chapter shell layout. docs/ART_DIRECTION.md section 3 (archetypes) + global motion rule 3 ("One
+   persistent SVG stage morphs across intro and all chapters. It is never torn down and replaced").
+   Desktop-first here; tablet/mobile overrides follow per docs/ART_DIRECTION.md's responsive table as
+   each chapter's real composition lands (this is the skeleton pass, not final per-chapter art).
+
+   Technique: ONE sticky, full-viewport stage layer holds the single NetworkView instance. Chapter
+   <section>s are normal in-flow content (prose/ledger/controls), stacked below the intro and scrolling
+   normally -- this is what keeps every control PERMANENTLY MOUNTED (never conditionally rendered per
+   chapter, which independent review flagged as the LineOutage mount-bug class) while still only ever
+   showing the chapter whose section the user has actually scrolled to. The stage's on-screen slot
+   (width/alignment within the sticky layer) is driven by `data-active-chapter` on `.stage-sticky`,
+   computed from useActiveChapter -- CSS state, not conditional React mounting. */
+
+.experience { position: relative; }
+
+.stage-sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  width: 100%;
+  pointer-events: none; /* re-enabled on .stage-inner's children (the actual SVG) below */
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  transition: opacity 240ms var(--ease-exit, ease);
+}
+.stage-sticky .stage-inner { pointer-events: auto; transition: width 600ms var(--ease-camera, ease), margin 600ms var(--ease-camera, ease); }
+@media (prefers-reduced-motion: reduce) { .stage-sticky, .stage-sticky .stage-inner { transition: none; } }
+
+/* Chapter 1 / 6: immersive canvas, full bleed. */
+.stage-sticky[data-active-chapter="intro"] .stage-inner,
+.stage-sticky[data-active-chapter="ch1"] .stage-inner,
+.stage-sticky[data-active-chapter="ch6"] .stage-inner { width: 100%; }
+
+/* Chapter 2: editorial split, prose-led -- network right, ~55%. */
+.stage-sticky[data-active-chapter="ch2"] .stage-inner { width: 55%; margin-left: auto; margin-right: var(--sp-8); }
+
+/* Chapter 3: focused inspector -- small locator inset, top-left, 20% max width. */
+.stage-sticky[data-active-chapter="ch3"] { align-items: flex-start; }
+.stage-sticky[data-active-chapter="ch3"] .stage-inner { width: 20%; margin: var(--sp-8) auto 0 var(--sp-8); }
+
+/* Chapter 4: editorial split, canvas-led, mirrored from chapter 2 -- network LEFT, ~65%. */
+.stage-sticky[data-active-chapter="ch4"] .stage-inner { width: 65%; margin-right: auto; margin-left: var(--sp-8); }
+
+/* Chapter 5: comparative view -- the main persistent stage is NOT shown (three independent, non-
+   interactive mini networks inside the chapter's own content do the work instead; see
+   docs/planning/cascadia/CHAPTER_ARCHITECTURE.md section 2's corrected resolution: "chapter 5 is the
+   only chapter where the stage is inert"). Kept mounted (opacity/pointer-events only), never unmounted. */
+.stage-sticky[data-active-chapter="ch5"] { opacity: 0; pointer-events: none; }
+
+.chapter-section {
+  position: relative;
+  z-index: 2;
+  min-height: 100vh;
+  padding: var(--sp-10) var(--sp-8);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  pointer-events: none; /* re-enabled on real content below, so empty chapter padding doesn't eat clicks meant for the stage behind it */
+}
+.chapter-section > * { pointer-events: auto; }
+.chapter-section[data-archetype="immersive"] { justify-content: flex-end; }
+.chapter-prose { max-width: 62ch; }
+.chapter-controls-column { max-width: 420px; }
+
+.fig-index {
+  position: fixed;
+  left: var(--sp-5);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.fig-index a {
+  font-size: 13px;
+  font-stretch: 75%;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  text-decoration: none;
+  padding: var(--sp-1) var(--sp-2);
+  border-left: 2px solid transparent;
+}
+.fig-index a:hover { color: var(--text); }
+.fig-index a[aria-current="step"] { color: var(--copper); border-left-color: var(--copper); }
+.fig-index a:focus-visible { outline: var(--border-active); outline-offset: 2px; }
+
+@media (max-width: 1023px) {
+  .fig-index { left: 0; top: 0; transform: none; flex-direction: row; width: 100%; padding: var(--sp-3) var(--sp-4); background: var(--surface); position: sticky; }
+  .stage-sticky { top: 44px; height: calc(100vh - 44px); }
+  .stage-sticky[data-active-chapter="ch2"] .stage-inner,
+  .stage-sticky[data-active-chapter="ch4"] .stage-inner { width: 100%; margin: 0; height: 55vh; align-self: flex-start; }
+  .stage-sticky[data-active-chapter="ch3"] .stage-inner { width: 96px; margin: var(--sp-3); }
+  .chapter-section { padding: var(--sp-8) var(--sp-4); }
+}

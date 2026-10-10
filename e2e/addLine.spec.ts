@@ -1,8 +1,15 @@
 // e2e coverage for CAS-INT-004 (add line), against the real production build/Worker. AddLine.tsx has
 // no <select> (plain buttons, one per candidate), so every test here IS fully keyboard-only (no tool
 // limitation to work around, unlike the select-driven controls in newControls.spec.ts).
+//
+// AddLine has no home chapter (DESIGN_SYSTEM.json's own `chapters` array confirms chapter 6, the
+// laboratory, is its only placement) -- every control interaction here goes through `lab()`/
+// `controlLab()`, not `home()`/`controlHome()`. Tests that also check the shared stage's bus/line
+// attributes (not just a control's own readout) scroll to chapter 6 first via `scrollToChapter`, since
+// chapter 6 is the one chapter that's always live (no story fixture) -- the natural place a real user
+// would actually combine AddLine with RemoveNode/AlterCapacity/LineOutage in one flow anyway.
 import { expect, test, type Page } from "@playwright/test";
-import { controlHome, home } from "./helpers/placement";
+import { controlLab, lab, scrollToChapter } from "./helpers/placement";
 
 async function withWasmDelay(page: Page, ms: number) {
   await page.route("**/*.wasm", async (route) => {
@@ -13,7 +20,7 @@ async function withWasmDelay(page: Page, ms: number) {
 
 test("adding candidate line 0 computes a real flow, matching the Python oracle", async ({ page }) => {
   await page.goto("/");
-  await home(page).getByRole("button", { name: "Add line 0" }).focus();
+  await lab(page).getByRole("button", { name: "Add line 0" }).focus();
   await page.keyboard.press("Enter");
   // solver-derived, verified against the Python oracle directly (0.0517 MW, slack, not binding)
   await expect.poll(() => page.locator('[data-testid="candidate-line"][data-candidate="0"]').getAttribute("aria-label"), { timeout: 3000 })
@@ -23,7 +30,7 @@ test("adding candidate line 0 computes a real flow, matching the Python oracle",
 
 test("a line added via the control can be removed directly from the SVG, keyboard-only", async ({ page }) => {
   await page.goto("/");
-  await home(page).getByRole("button", { name: "Add line 0" }).focus();
+  await lab(page).getByRole("button", { name: "Add line 0" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-testid="candidate-line"][data-candidate="0"]')).toHaveAttribute("data-added", "true", { timeout: 3000 });
   await page.locator('[data-testid="candidate-line"][data-candidate="0"]').focus();
@@ -40,31 +47,32 @@ test("D2/topology/N1 proof: adding candidate line 0 turns an infeasible bus-26 r
   // the line, so it exercises the CONFIRMED-state combination path only, not a genuine D1 race (an
   // in-flight-overlap race would need its own dedicated test, not this one).
   await page.goto("/");
-  await controlHome(page, "Alter line capacity").locator('select').selectOption({ index: 1 });
-  const cb = home(page).getByRole("checkbox", { name: "Allow load shedding" });
+  await scrollToChapter(page, "ch6"); // the stage must reflect live truth for the final bus-26 check below
+  await controlLab(page, "Alter line capacity").locator('select').selectOption({ index: 1 });
+  const cb = controlLab(page, "Alter line capacity").getByRole("checkbox", { name: "Allow load shedding" });
   await cb.focus();
   await page.keyboard.press("Space");
   await expect(cb).not.toBeChecked();
   await page.locator('[data-testid="bus"][data-bus="26"]').focus();
   await page.keyboard.press("Enter");
-  await home(page).getByRole("button", { name: "Confirm removal" }).focus();
+  await controlLab(page, "Remove substation").getByRole("button", { name: "Confirm removal" }).focus();
   await page.keyboard.press("Enter");
-  await expect(home(page).getByTestId("unserved-mw")).toHaveText("n/a (infeasible)", { timeout: 5000 });
-  await home(page).getByRole("button", { name: "Add line 0" }).focus();
+  await expect(controlLab(page, "Remove substation").getByTestId("unserved-mw")).toHaveText("n/a (infeasible)", { timeout: 5000 });
+  await lab(page).getByRole("button", { name: "Add line 0" }).focus();
   await page.keyboard.press("Enter"); // this request must carry the still-active bus-26 removal (D1/base())
-  await expect(home(page).getByTestId("unserved-mw")).not.toHaveText("n/a (infeasible)", { timeout: 5000 });
+  await expect(controlLab(page, "Remove substation").getByTestId("unserved-mw")).not.toHaveText("n/a (infeasible)", { timeout: 5000 });
   await expect(page.locator('[data-testid="bus"][data-bus="26"]')).toHaveAttribute("data-state", "removed"); // removal itself still applied
 });
 
 test("N1: adding a line respects the current 'Allow load shedding' setting, not the engine default", async ({ page }) => {
   await page.goto("/");
-  await controlHome(page, "Alter line capacity").locator('select').selectOption({ index: 1 });
-  const cb = home(page).getByRole("checkbox", { name: "Allow load shedding" });
+  await controlLab(page, "Alter line capacity").locator('select').selectOption({ index: 1 });
+  const cb = controlLab(page, "Alter line capacity").getByRole("checkbox", { name: "Allow load shedding" });
   await cb.focus();
   await page.keyboard.press("Space");
   await expect(cb).not.toBeChecked();
   await expect(page.locator(".provenance")).toContainText("shedding disabled", { timeout: 2000 });
-  await home(page).getByRole("button", { name: "Add line 0" }).focus();
+  await lab(page).getByRole("button", { name: "Add line 0" }).focus();
   await page.keyboard.press("Enter");
   // base() must carry allowShed=false into this request too -- if N1 regressed here, the label
   // below would read "candidate line 0 added" with no "shedding disabled" suffix
@@ -74,7 +82,7 @@ test("N1: adding a line respects the current 'Allow load shedding' setting, not 
 test("reset during an active add-line solve restores no-candidates-added", async ({ page }) => {
   await withWasmDelay(page, 1500);
   await page.goto("/");
-  const toggleBtn = controlHome(page, "Add transmission line").locator('li:has-text("line 0:") button');
+  const toggleBtn = controlLab(page, "Add transmission line").locator('li:has-text("line 0:") button');
   await toggleBtn.focus();
   await page.keyboard.press("Enter"); // solve in flight (~1.5s, the page's first solve); label flips to "Remove" optimistically
   await expect(toggleBtn).toBeDisabled();
@@ -92,12 +100,13 @@ test("N2-class check: an unrelated control's solve does not retroactively change
   // somehow clear addedLines, which would be a different instance of "lost confirmed intent".
   await withWasmDelay(page, 800);
   await page.goto("/");
-  await home(page).getByRole("button", { name: "Add line 0" }).focus();
+  await scrollToChapter(page, "ch6"); // the stage must reflect live truth for the outaged-line check below
+  await lab(page).getByRole("button", { name: "Add line 0" }).focus();
   await page.keyboard.press("Enter");
   await expect(page.locator('[data-testid="candidate-line"][data-candidate="0"]')).toHaveAttribute("data-added", "true", { timeout: 3000 });
-  await controlHome(page, "Line outage").locator('select').selectOption({ index: 1 });
-  await home(page).getByRole("button", { name: "Disable line" }).click();
-  await home(page).getByRole("button", { name: "Confirm outage" }).click();
+  await controlLab(page, "Line outage").locator('select').selectOption({ index: 1 });
+  await controlLab(page, "Line outage").getByRole("button", { name: "Disable line" }).click();
+  await controlLab(page, "Line outage").getByRole("button", { name: "Confirm outage" }).click();
   await expect(page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]')).toBeVisible({ timeout: 3000 });
   await expect(page.locator('[data-testid="candidate-line"][data-candidate="0"]')).toHaveAttribute("data-added", "true");
 });

@@ -17,7 +17,7 @@ import { ScenarioReadout } from './ScenarioReadout'
 // line the dialog was opened for; `confirming` is derived as "dialog open AND still for the current
 // shared line", so the dialog auto-closes the instant the shared selection diverges from what this
 // instance's user actually confirmed, instead of silently re-pointing at the new one.
-export function LineOutage({ placement = 'home' }: { placement?: 'home' | 'lab' } = {}) {
+export function LineOutage({ placement }: { placement: 'home' | 'lab' }) {
   const { state, dispatch, setLineOutage } = useApp()
   const { network, disabledLines, pending, solve, result, outageLine: line } = state
   const [confirmingLine, setConfirmingLine] = useState<number | null>(null)

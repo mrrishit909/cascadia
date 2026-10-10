@@ -9,7 +9,7 @@ const mw = (v: number) => `${v.toFixed(2)} MW`
 // button used to live here; moved to src/app/ResetButton.tsx (its own always-single-mount home) ahead
 // of RemoveNode ever being dual-mounted (home chapter + lab, matching every other control per
 // docs/ART_DIRECTION.md) -- a reset button owned by a dual-mounted component would duplicate.
-export function RemoveNode({ placement = 'home' }: { placement?: 'home' | 'lab' } = {}) {
+export function RemoveNode({ placement }: { placement: 'home' | 'lab' }) {
   const { state, dispatch, removeBus } = useApp()
   const { network, result, selectedBus, removedBus, solve, solveError } = state
   const headingId = useId()

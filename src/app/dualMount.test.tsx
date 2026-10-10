@@ -32,7 +32,7 @@ async function setup(children: React.ReactNode, waitForText: string) {
 
 describe('dual mount: IncreaseLoad (draft lifted to AppState.loadDraft)', () => {
   it('selecting a bus and dragging the slider in instance A shows identically in instance B', async () => {
-    await setup(<><div data-testid="home"><IncreaseLoad /></div><div data-testid="lab"><IncreaseLoad /></div></>, "Increase load")
+    await setup(<><div data-testid="home"><IncreaseLoad placement="home" /></div><div data-testid="lab"><IncreaseLoad placement="lab" /></div></>, "Increase load")
     const home = within(screen.getByTestId('home'))
     const lab = within(screen.getByTestId('lab'))
     fireEvent.change(home.getByLabelText('Load bus'), { target: { value: '1' } })
@@ -48,7 +48,7 @@ describe('dual mount: IncreaseLoad (draft lifted to AppState.loadDraft)', () => 
   })
 
   it('every [id] on the page is unique with two instances mounted (useId(), not hardcoded)', async () => {
-    await setup(<><IncreaseLoad /><IncreaseLoad /></>, "Increase load")
+    await setup(<><IncreaseLoad placement="home" /><IncreaseLoad placement="lab" /></>, "Increase load")
     const ids = Array.from(document.querySelectorAll('[id]')).map(e => e.id)
     expect(new Set(ids).size).toBe(ids.length)
   })
@@ -56,7 +56,7 @@ describe('dual mount: IncreaseLoad (draft lifted to AppState.loadDraft)', () => 
 
 describe('dual mount: ReduceGenerator (draft lifted to AppState.genDraft)', () => {
   it('selecting a generator and setting Pmax in instance A shows identically in instance B', async () => {
-    await setup(<><div data-testid="home"><ReduceGenerator /></div><div data-testid="lab"><ReduceGenerator /></div></>, "Reduce generator")
+    await setup(<><div data-testid="home"><ReduceGenerator placement="home" /></div><div data-testid="lab"><ReduceGenerator placement="lab" /></div></>, "Reduce generator")
     const home = within(screen.getByTestId('home'))
     const lab = within(screen.getByTestId('lab'))
     fireEvent.change(home.getByLabelText('Generator'), { target: { value: '0' } })
@@ -68,7 +68,7 @@ describe('dual mount: ReduceGenerator (draft lifted to AppState.genDraft)', () =
 
 describe('dual mount: AlterCapacity (draft lifted to AppState.capDraft, selectLine resync moved into the reducer)', () => {
   it('selecting a line and dragging the capacity slider in instance A shows identically in instance B', async () => {
-    await setup(<><div data-testid="home"><AlterCapacity /></div><div data-testid="lab"><AlterCapacity /></div></>, "Alter line capacity")
+    await setup(<><div data-testid="home"><AlterCapacity placement="home" /></div><div data-testid="lab"><AlterCapacity placement="lab" /></div></>, "Alter line capacity")
     const home = within(screen.getByTestId('home'))
     const lab = within(screen.getByTestId('lab'))
     fireEvent.change(home.getByLabelText('Line'), { target: { value: '9' } })
@@ -81,7 +81,7 @@ describe('dual mount: AlterCapacity (draft lifted to AppState.capDraft, selectLi
     // This is the exact bug class the selectLine-resync-into-the-reducer fix closes: a newly (re)mounted
     // instance's old per-component mount-time resync effect would fire with the LAST-CONFIRMED value and
     // overwrite the shared capDraft, discarding whatever uncommitted edit instance A had in progress.
-    const { rerender } = await setup(<div data-testid="home"><AlterCapacity /></div>, "Alter line capacity")
+    const { rerender } = await setup(<div data-testid="home"><AlterCapacity placement="home" /></div>, "Alter line capacity")
     const home = within(screen.getByTestId('home'))
     fireEvent.change(home.getByLabelText('Line'), { target: { value: '9' } })
     fireEvent.change(home.getByRole('slider'), { target: { value: '0.42' } }) // uncommitted draft, no Apply/debounce fired yet
@@ -89,8 +89,8 @@ describe('dual mount: AlterCapacity (draft lifted to AppState.capDraft, selectLi
     const highs = await highsLoader()
     rerender(
       <AppProvider solver={async (c, sc, cands) => solveDcopf(c, highs, sc, cands)}>
-        <div data-testid="home"><AlterCapacity /></div>
-        <div data-testid="lab"><AlterCapacity /></div>
+        <div data-testid="home"><AlterCapacity placement="home" /></div>
+        <div data-testid="lab"><AlterCapacity placement="lab" /></div>
       </AppProvider>,
     )
     // instance B mounts fresh (its own mount-time machinery runs) -- A's draft must survive untouched
@@ -102,7 +102,7 @@ describe('dual mount: AlterCapacity (draft lifted to AppState.capDraft, selectLi
 
 describe('dual mount: LineOutage (selection lifted to AppState.outageLine)', () => {
   it('selecting a line in instance A shows identically in instance B', async () => {
-    await setup(<><div data-testid="home"><LineOutage /></div><div data-testid="lab"><LineOutage /></div></>, "Line outage")
+    await setup(<><div data-testid="home"><LineOutage placement="home" /></div><div data-testid="lab"><LineOutage placement="lab" /></div></>, "Line outage")
     const home = within(screen.getByTestId('home'))
     const lab = within(screen.getByTestId('lab'))
     fireEvent.change(home.getByLabelText('Line to disable'), { target: { value: '0' } })
@@ -116,7 +116,7 @@ describe('dual mount: LineOutage (selection lifted to AppState.outageLine)', () 
     // SECOND mount (chapter's lab placement) while a line is already selected renders that instance's
     // own "Disable line"/"Restore line" trigger button immediately and the effect's mount-time run
     // yanks keyboard focus to it -- regardless of what the user was actually doing elsewhere on the page.
-    const { rerender } = await setup(<div data-testid="home"><LineOutage /></div>, "Line outage")
+    const { rerender } = await setup(<div data-testid="home"><LineOutage placement="home" /></div>, "Line outage")
     const home = within(screen.getByTestId('home'))
     fireEvent.change(home.getByLabelText('Line to disable'), { target: { value: '0' } })
     const triggerA = home.getByText('Disable line')
@@ -125,8 +125,8 @@ describe('dual mount: LineOutage (selection lifted to AppState.outageLine)', () 
     const highs = await highsLoader()
     rerender(
       <AppProvider solver={async (c, sc, cands) => solveDcopf(c, highs, sc, cands)}>
-        <div data-testid="home"><LineOutage /></div>
-        <div data-testid="lab"><LineOutage /></div>
+        <div data-testid="home"><LineOutage placement="home" /></div>
+        <div data-testid="lab"><LineOutage placement="lab" /></div>
       </AppProvider>,
     )
     // instance B mounts fresh with outageLine already '0' (shared), so its own trigger button renders
@@ -142,7 +142,7 @@ describe('dual mount: LineOutage (selection lifted to AppState.outageLine)', () 
     // Fixed by tracking `confirmingLine` (the specific line this instance's dialog was opened for) and
     // deriving `confirming` as "dialog open AND still for the current shared line"; the dialog now
     // auto-closes the instant the shared selection diverges from what this instance actually confirmed.
-    await setup(<><div data-testid="home"><LineOutage /></div><div data-testid="lab"><LineOutage /></div></>, "Line outage")
+    await setup(<><div data-testid="home"><LineOutage placement="home" /></div><div data-testid="lab"><LineOutage placement="lab" /></div></>, "Line outage")
     const home = within(screen.getByTestId('home'))
     const lab = within(screen.getByTestId('lab'))
     fireEvent.change(home.getByLabelText('Line to disable'), { target: { value: '0' } })
@@ -170,7 +170,7 @@ describe('dual mount: LineOutage focus-steal guard under StrictMode', () => {
     const { rerender } = render(
       <StrictMode>
         <AppProvider solver={async (c, sc, cands) => solveDcopf(c, highs, sc, cands)}>
-          <div data-testid="home"><LineOutage /></div>
+          <div data-testid="home"><LineOutage placement="home" /></div>
         </AppProvider>
       </StrictMode>,
     )
@@ -183,8 +183,8 @@ describe('dual mount: LineOutage focus-steal guard under StrictMode', () => {
     rerender(
       <StrictMode>
         <AppProvider solver={async (c, sc, cands) => solveDcopf(c, highs, sc, cands)}>
-          <div data-testid="home"><LineOutage /></div>
-          <div data-testid="lab"><LineOutage /></div>
+          <div data-testid="home"><LineOutage placement="home" /></div>
+          <div data-testid="lab"><LineOutage placement="lab" /></div>
         </AppProvider>
       </StrictMode>,
     )

@@ -15,7 +15,7 @@ const DEBOUNCE_MS = 250
 // (refs can't be shared state, and don't need to be: whichever mounted instance the user is actually
 // interacting with owns firing the debounced Worker call; the shared draft value means both instances
 // display the same thing regardless of which one is doing the firing).
-export function AlterCapacity({ placement = 'home' }: { placement?: 'home' | 'lab' } = {}) {
+export function AlterCapacity({ placement }: { placement: 'home' | 'lab' }) {
   const { state, dispatch, setCapacity } = useApp()
   const { network, result, selectedLine, pending, solve, solveError, capDraft, epoch } = state
   const { factor, allowShed } = capDraft

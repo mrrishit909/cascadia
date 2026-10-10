@@ -1,12 +1,14 @@
-import { render, screen, within } from '@testing-library/react'
+import { act, render, screen, within } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import App from './App'
+import { homeControl } from './testHelpers'
+import { activateChapter } from '../test-setup'
 
-// Scene now also mounts a 'lab' placement of every control (LabStub, App.tsx) as the dual-placement
-// gate proof -- so testids/roles that live inside a control (not the NetworkView stage, not app-level
-// singletons like Reset/StatusRegion) are no longer unique across the whole document. `home()` scopes
-// queries to the 'home' placement only, mirroring e2e's home(page) locator.
-const home = () => within(screen.getByTestId('home-controls'))
+// Chapter shell: every control's home placement now lives inside its own chapter <section>, not a
+// single wrapper div -- so testids/roles that live inside a control (not the NetworkView stage, not
+// app-level singletons like Reset/StatusRegion) are no longer unique across the whole document.
+// `homeControl(label)` scopes queries to the one home-placement control section matching that text,
+// mirroring e2e's controlHome(page, label).
 
 const files = import.meta.glob('/public/data/**/*.json', { import: 'default' }) as Record<string, () => Promise<unknown>>
 
@@ -58,19 +60,26 @@ it('removing bus 26 shows oracle unserved MW, no-generation shed, and reset rest
   const Probe = () => { snap = useApp().state; return null }
   render(<AppProvider solver={async (c, sc) => solveDcopf(c, highs, sc)}><Probe /><Scene /></AppProvider>)
   await screen.findAllByTestId('bus')
+  // jsdom has no real scroll/intersection geometry (see test-setup.ts's mock) -- this test asserts on
+  // the SHARED STAGE's own bus data-state, which only shows this control's live result while chapter 4
+  // (RemoveNode's home chapter) is the active one; a real browser user actually scrolled there sees
+  // exactly this. Chapters 1/intro/5 would legitimately keep showing the baseline story regardless of
+  // this action, by design (CHAPTER_ARCHITECTURE.md section 3) -- this is not a workaround for a bug.
+  act(() => activateChapter('ch4'))
   const baseline = snap.result, baselineCopy = structuredClone(snap.result)
-  expect(home().getByTestId('unserved-mw')).toHaveTextContent('0.00 MW')
+  const removeNode = () => within(homeControl('Remove substation'))
+  expect(removeNode().getByTestId('unserved-mw')).toHaveTextContent('0.00 MW')
 
   const bus = screen.getAllByTestId('bus')[26]
   bus.focus(); fireEvent.keyDown(bus, { key: 'Enter' }) // keyboard select
-  fireEvent.keyDown(home().getByRole('group', { name: 'Confirm removal' }), { key: 'Escape' })
-  expect(home().queryByRole('group', { name: 'Confirm removal' })).toBeNull() // Escape cancels
+  fireEvent.keyDown(removeNode().getByRole('group', { name: 'Confirm removal' }), { key: 'Escape' })
+  expect(removeNode().queryByRole('group', { name: 'Confirm removal' })).toBeNull() // Escape cancels
   fireEvent.keyDown(bus, { key: ' ' })
-  fireEvent.click(home().getByText('Confirm removal'))
-  expect(home().getByText(/Solving island-aware/)).toBeTruthy()
-  await waitFor(() => expect(home().getByTestId('unserved-mw')).toHaveTextContent(`${ref.total_shed.toFixed(2)} MW`))
-  expect(home().getByTestId('shed-no-generation')).toHaveTextContent(`${ref.shed_no_generation.toFixed(2)} MW`)
-  expect(home().getByTestId('shed-economic')).toHaveTextContent('0.00 MW')
+  fireEvent.click(removeNode().getByText('Confirm removal'))
+  expect(removeNode().getByText(/Solving island-aware/)).toBeTruthy()
+  await waitFor(() => expect(removeNode().getByTestId('unserved-mw')).toHaveTextContent(`${ref.total_shed.toFixed(2)} MW`))
+  expect(removeNode().getByTestId('shed-no-generation')).toHaveTextContent(`${ref.shed_no_generation.toFixed(2)} MW`)
+  expect(removeNode().getByTestId('shed-economic')).toHaveTextContent('0.00 MW')
   expect(bus).toHaveAttribute('data-state', 'removed')
   expect(screen.getAllByTestId('bus').some(b => b.getAttribute('data-state') === 'shed_no_generation')).toBe(true)
 
@@ -78,7 +87,7 @@ it('removing bus 26 shows oracle unserved MW, no-generation shed, and reset rest
   expect(snap.result).toBe(baseline) // same reference
   expect(snap.result).toEqual(baselineCopy)
   expect(snap.removedBus).toBeNull()
-  expect(home().getByTestId('unserved-mw')).toHaveTextContent('0.00 MW')
+  expect(removeNode().getByTestId('unserved-mw')).toHaveTextContent('0.00 MW')
 })
 
 // CAS-INT-005: oracle case line_cap_9_x0.5 (binding [9,28,29], shed 5.2996 MW).
@@ -94,14 +103,16 @@ it('line 9 at 0.5x shows oracle binding lines and shed, and reset restores basel
   const Probe = () => { snap = useApp().state; return null }
   render(<AppProvider solver={async (c, sc) => solveDcopf(c, highs, sc)}><Probe /><Scene /></AppProvider>)
   await screen.findAllByTestId('bus')
+  act(() => activateChapter('ch3')) // AlterCapacity's home chapter -- see the matching comment above
   const baseline = snap.result, baselineCopy = structuredClone(snap.result)
-  expect(home().getByTestId('binding-lines')).toHaveTextContent('none')
+  const alterCap = () => within(homeControl('Alter line capacity'))
+  expect(alterCap().getByTestId('binding-lines')).toHaveTextContent('none')
 
   const line = screen.getAllByTestId('line')[9]
   line.focus(); fireEvent.keyDown(line, { key: 'Enter' }) // keyboard select
-  fireEvent.change(home().getByRole('slider'), { target: { value: '0.5' } })
-  await waitFor(() => expect(home().getByTestId('binding-lines')).toHaveTextContent(ref.binding_lines.join(', ')), { timeout: 3000 })
-  expect(home().getByTestId('cap-unserved')).toHaveTextContent(`${ref.total_shed.toFixed(2)} MW`)
+  fireEvent.change(alterCap().getByRole('slider'), { target: { value: '0.5' } })
+  await waitFor(() => expect(alterCap().getByTestId('binding-lines')).toHaveTextContent(ref.binding_lines.join(', ')), { timeout: 3000 })
+  expect(alterCap().getByTestId('cap-unserved')).toHaveTextContent(`${ref.total_shed.toFixed(2)} MW`)
   for (const i of ref.binding_lines) expect(screen.getAllByTestId('line')[i]).toHaveAttribute('data-binding', 'binding')
   expect(screen.getAllByTestId('line')[0]).toHaveAttribute('data-binding', 'slack')
 
@@ -109,6 +120,6 @@ it('line 9 at 0.5x shows oracle binding lines and shed, and reset restores basel
   expect(snap.result).toBe(baseline)
   expect(snap.result).toEqual(baselineCopy)
   expect(snap.lineCapacity).toEqual({})
-  expect(home().getByTestId('binding-lines')).toHaveTextContent('none')
+  expect(alterCap().getByTestId('binding-lines')).toHaveTextContent('none')
   expect(screen.getAllByTestId('line')[9]).toHaveAttribute('data-binding', 'slack')
 })
