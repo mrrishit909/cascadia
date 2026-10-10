@@ -77,6 +77,13 @@
 }
 .chapter-section > * { pointer-events: auto; }
 .chapter-section[data-archetype="immersive"] { justify-content: flex-end; }
+
+/* Chapter 2's scroll-scrub (Chapter2Scene.tsx) needs real scroll DISTANCE to traverse 0-1 progress
+   while still being the chapter useActiveChapter's own IntersectionObserver considers dominant --
+   the default 100vh section left too little runway, and the scrub's own end point had to be moved
+   off 'bottom top' to compensate (see Chapter2Scene.tsx's comment on the handoff race this caused,
+   found via a real e2e test, not assumed). */
+#ch2.chapter-section { min-height: 200vh; }
 .chapter-prose { max-width: 62ch; }
 .chapter-controls-column { max-width: 420px; }
 

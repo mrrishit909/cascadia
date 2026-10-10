@@ -13,8 +13,18 @@ export function ChapterTitle({ sceneId, active, children }: { sceneId: string; a
   useScene(sceneId, ref, ({ gsap, reducedMotion }) => {
     const el = ref.current
     if (!el) return
-    if (!active) { gsap.set(el, { clipPath: 'inset(0 0 100% 0)' }); return }
+    // Kill any still-running reveal tween FIRST: this chapter's own version of the stale-timeline bug
+    // IntroSequence's review caught -- useGSAP does not revert a running tween just because `active`
+    // flipped again before it finished (leaving within 800ms of entry, e.g. a fast FIG-index jump to
+    // another chapter, let the old tween keep animating clip-path back toward 0% and silently
+    // overwrite the hide this effect is about to set below).
+    gsap.killTweensOf(el)
+    // Reduced motion means "immediate text," full stop -- never clipped, active or not, so a user who
+    // hasn't scrolled an inactive chapter's heading into view yet doesn't see it rendered as a blank
+    // gap (the original ordering checked `!active` BEFORE `reducedMotion`, clipping every inactive
+    // title regardless of motion preference).
     if (reducedMotion) { gsap.set(el, { clipPath: 'inset(0 0 0% 0)' }); return }
+    if (!active) { gsap.set(el, { clipPath: 'inset(0 0 100% 0)' }); return }
     gsap.fromTo(el, { clipPath: 'inset(0 0 100% 0)' }, { clipPath: 'inset(0 0 0% 0)', duration: 0.8, ease: 'power2.out' })
   }, [active])
   return <h2 ref={ref}>{children}</h2>

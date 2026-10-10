@@ -42,4 +42,16 @@ describe('ChapterTitle (masked reveal, ART_DIRECTION.md motion sheet: "chapter t
     const h2 = container.querySelector('h2') as HTMLElement
     expect(h2.style.clipPath).toBe('inset(0 0 100% 0)')
   })
+
+  it('REGRESSION: reduced motion never clips, even while inactive (a title must not scroll in as a blank gap)', () => {
+    const origMatchMedia = window.matchMedia
+    window.matchMedia = (query: string) => ({ ...origMatchMedia(query), matches: query.includes('prefers-reduced-motion') })
+    try {
+      const { container } = render(<ChapterTitle sceneId="t-e" active={false}>FIG. 05</ChapterTitle>)
+      const h2 = container.querySelector('h2') as HTMLElement
+      expect(h2.style.clipPath).toBe('inset(0 0 0% 0)')
+    } finally {
+      window.matchMedia = origMatchMedia
+    }
+  })
 })

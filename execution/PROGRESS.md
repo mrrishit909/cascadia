@@ -517,32 +517,109 @@ read before calling this chapter done: `verification/SCREENSHOTS/ch2-desktop-144
 
 Test counts: 56/56 vitest, 69/69 e2e (+5: chapter2.spec.ts), 32/32 pytest, clean build.
 
+## Chapter 2 review pass: 4 more real bugs found, all fixed (advisor review, before chapter 3 began)
+
+An advisor review of the committed chapter 2 work, deliberately done before starting chapter 3 (which
+would otherwise have copied the same scrub pattern blind), found 4 further real defects -- all
+confirmed by direct reproduction, not assumed, then fixed:
+
+1. **The scrub could never reach its own end state while chapter 2 was active.** `end:'bottom top'`
+   makes progress=1 coincide almost exactly with `useActiveChapter` handing off to chapter 3 (its own
+   independent IntersectionObserver dominance check), so `claimCamera`'s ownership guard silently
+   dropped every claim from that point on -- "demand" could never fully show. Confirmed by sweeping
+   scroll fraction 0.1-1.0 and logging `data-active-chapter`/viewBox/opacity at each step (the sweep
+   script is reusable for chapter 3's own tuning). Fixed two ways together: `#ch2.chapter-section`
+   given real scroll runway (`min-height: 200vh`) and the trigger's `end` moved to `'60% top'`,
+   confirmed empirically to land with a comfortable margin before the actual handoff (~75-80%).
+2. **No state applied when the trigger is first created.** `setup()` hard-coded gen=1/demand=0/
+   `FULL_CAMERA`; the correct value for wherever the user ACTUALLY is only applied on the next scroll
+   event. Arriving already mid-section (scrolling up from chapter 3, a keyboard jump that flips
+   `active` without a further scroll) showed stale defaults until the next scroll, then popped.
+   Fixed: one `apply(progress)` function, called both from `onUpdate` and once immediately with the
+   trigger's own just-created `st.progress`.
+3. **Direct FIG-index navigation landed at the scrub's START, not its end state**, contradicting
+   ART_DIRECTION.md's own "Direct index navigation lands in the end state" line. Fixed in
+   `FigIndex.tsx`: a `SCRUB_END_FRACTION` map (kept in sync with each scene's own trigger `end`) drives
+   an `onClick` handler that scrolls to the chapter's end-state position instead of letting the native
+   anchor jump land at its top; the `href` itself is left as a real anchor for middle-click/new-tab.
+4. **`ChapterTitle` had the same stale-tween bug IntroSequence's own earlier review caught**: `useGSAP`
+   does not revert a running tween just because `active` flipped again before the 800ms reveal
+   finished, so leaving a chapter mid-reveal (a fast FIG-index jump elsewhere) let the old tween keep
+   animating the hidden title back open afterward. Fixed: `gsap.killTweensOf(el)` as the first line of
+   `setup()` -- the exact same fix pattern as `IntroSequence`'s `tlRef.current?.kill()`, now established
+   as the standard opening move for every scene in this codebase, one-shot or scrubbed. Also fixed:
+   the original branch order clipped every INACTIVE title regardless of reduced motion, so an inactive
+   chapter's heading rendered as a blank gap under reduced motion (spec: "immediate text," unconditional)
+   -- reordered to check `reducedMotion` before `active`.
+
+Also added the directive's full motion-behavior checklist that chapter 2's first test pass had
+skipped: reverse scroll (confirmed the scrub genuinely runs backward, not just forward), an interrupted
+transition (fast-scrolling straight past chapter 2 into chapter 4 leaves no stale camera claim behind),
+and the instant FIG-index jump landing correctly (item 3 above, now covered by its own regression test).
+`e2e/chapter2.spec.ts` grew to 11 tests, `e2e/chapterTitle.spec.ts` (new, 2 tests) covers the shared
+primitive's own regressions once, not per-chapter. One of the new tests was itself flaky on first write
+(a scroll-fraction arithmetic mistake: scrolling to 50% of the SECTION gives scrub progress 0.5/0.6=
+0.83 now that the trigger ends at 60%, not 0.5 -- caught by actually re-running the suite with repeats
+until stable, not trusting a single green run).
+
+Test counts: 57/57 vitest, 75/75 e2e (+2 ChapterTitle, +6 chapter2 reverse/interrupted/instant-jump/
+end-state regressions), 32/32 pytest, clean build, stable across repeated runs.
+
 ## Resume point if this session ends mid-chapter-work
 
 Check `git log --oneline -10` for the most recent commit, and re-read this file plus
 `docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` and `docs/ART_DIRECTION.md` section 4 (storyboard/motion
 table) by then. The shared GSAP lifecycle layer, the FULL intro sequence (beats 1-4, Skip, chrome
 reveal), the shared `ChapterTitle` masked-reveal primitive, chapter 1 ("Grid formation"), and chapter 2
-("Demand and generation", the first real scroll-scrub + the camera-ownership effect-ordering fix) are
-built, verified, and committed -- this is the pattern every subsequent scene should follow (`useScene`,
-not raw `useGSAP`/`ScrollTrigger`; one continuous timeline per one-shot scene, OR a real ScrollTrigger
-scrub for a continuously scroll-bound one like chapter 2/3; camera writes go through `claimCamera`, and
-`Scene`'s own reset in `App.tsx` is now in the render body, NOT a `useEffect` -- do not revert that
-without re-reading the comment explaining why).
+("Demand and generation") are built, reviewed, verified, and committed -- this is the pattern every
+subsequent scene should follow:
+- `useScene`, not raw `useGSAP`/`ScrollTrigger`.
+- **Every scene's `setup()` starts by killing its own prior work first** -- `gsap.killTweensOf()` for
+  plain tweens (`ChapterTitle`), `tlRef.current?.kill()` for a one-shot timeline (`IntroSequence`).
+  `useGSAP`'s own revert-on-dependency-change is NOT reliable for either case; this is now the
+  established opening move for every scene, not optional per-scene judgment.
+- A scroll-scrubbed scene (chapter 2's pattern, reusable for chapter 3) needs: (a) real scroll runway
+  so its trigger's `end` can land comfortably BEFORE `useActiveChapter`'s own handoff point --
+  sweep-test the actual handoff fraction empirically, don't guess it; (b) one `apply(progress)`
+  function called both from `onUpdate` AND once immediately after `ScrollTrigger.create()`, so a user
+  arriving mid-range without a further scroll event sees the correct state, not stale defaults; (c) a
+  `FigIndex.tsx` `SCRUB_END_FRACTION` entry so direct index navigation lands in the end state, kept in
+  sync with the trigger's own `end`.
+- Camera writes go through `claimCamera`, and `Scene`'s own reset in `App.tsx` is in the render body,
+  NOT a `useEffect` (React runs layout effects, which `useGSAP` is built on, children-before-parents
+  the same as plain effects -- there is no ordering guarantee a parent's plain `useEffect` can lean on
+  to run before a child's camera claim). Do not revert that without re-reading the comment explaining
+  why.
 
 **Before trusting ANY chapter's visual or camera state**, take and READ a real (non-`fullPage`)
 screenshot at the chapter's actual scroll position, AND cross-check the specific thing that matters
-(a `viewBox` attribute, a `data-*` flag, computed opacity) via direct `evaluate`/`getAttribute` --
-chapter 1's background bug and chapter 2's effect-ordering bug were BOTH invisible to a quick visual
-glance and only surfaced by checking the actual DOM/computed state, not assumed from reading the code
-or trusting a screenshot alone.
+(a `viewBox` attribute, a `data-*` flag, computed opacity) via direct `evaluate`/`getAttribute` -- every
+real bug found across chapters 1 and 2 (the background bug, the effect-ordering bug, the unreachable-
+end-state bug, the stale-tween bug) was invisible to a quick visual glance and only surfaced by checking
+actual DOM/computed state or a genuinely independent review, never assumed from reading the code or
+trusting one green test run.
 
 Continue with chapter 3 ("capacity bottlenecks": focused inspector, NO large network at all -- a
-locator inset top-left plus the corridor-strip morph ART_DIRECTION.md section 3 describes, using the
-same `lerpCamera`/ScrollTrigger-scrub pattern chapter 2 just established), then chapters 4-6 in order,
-each verified (vitest + real-browser e2e + real screenshots at all 3 breakpoints + reduced motion,
-actually read, not just generated) and committed before moving to the next. After chapter 6: production
-frame-pacing measurement against ART_DIRECTION.md section 4's kill criteria (chapter 4 fracture + a lab
-node removal, glow on; p95 <=16.7ms desktop, <=33.3ms mobile/throttled), then an independent adversarial
-review in an isolated worktree per the directive's phase 6, then final release readiness per phase 8. Do
-not claim performance compliance or final acceptance without that evidence.
+locator inset top-left plus the corridor-strip morph ART_DIRECTION.md section 3 describes), applying
+every lesson above from the start rather than rediscovering them. The last review's chapter-3-specific
+checklist (not yet started, still applies in full): single data source for rail values (the same
+`stageResult`/`chapter3Diverged` App.tsx already computes, binding from `result.binding_lines`, "n/a
+(infeasible)" never 0.00), a fixed rail set (top 4 by \|flow\|/rating from baseline, computed once) plus
+an INSPECTED rail bound to AlterCapacity's actual existing selection state (not a second source of
+truth), an "ALSO AT LIMIT" list of real buttons for off-rail binding lines, rail geometry measured via
+the stage SVG's `getScreenCTM()` re-measured on every scrub update (the inset moves), the CSS
+`width:20%`-with-transition inset-shrink rule replaced by a `transform:scale` driven FROM the scrub
+(not competing with it), the glow group faded out during the transform (this is the project's own
+stated kill-criterion case -- do the fade-during-transform now, don't wait to discover it during
+measurement), and the real tablet (160px top-left) / mobile (96px top-right + plain line list, since
+the inset can't meet 44px touch targets) locator variants. Then chapters 4-6 in order, each verified
+(vitest + real-browser e2e covering entry/midpoint/exit/forward/reverse/instant-jump/interrupted/
+reduced-motion/analytical-preservation + real screenshots at all 3 breakpoints, actually read) and
+committed before moving to the next. After chapter 6: production frame-pacing measurement against
+ART_DIRECTION.md section 4's kill criteria (chapter 4 fracture + a lab node removal, glow on; p95
+<=16.7ms desktop, <=33.3ms mobile/throttled), then an independent adversarial review in an isolated
+worktree per the directive's phase 6, then final release readiness per phase 8. Do not claim
+performance compliance or final acceptance without that evidence.
+
+**Shared work still unbuilt, tracked here rather than silently dropped:** a mobile bottom-sheet pattern
+for controls (chapters 2/3/5/6 all need one per ART_DIRECTION.md's responsive table; none exists yet).
