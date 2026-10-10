@@ -274,22 +274,70 @@ lab is always-live anyway -- harmless today, but means a candidate line added vi
 EVERY chapter's stage, including chapter 1's baseline story, if a user later scrolled back up. Minor,
 flagged for whoever adds AddLine's own divergence predicate if this ever matters visually.
 
-## Next: GSAP motion, one chapter at a time (not yet started)
+## Shared GSAP lifecycle layer + intro beat 1 landed (commit `007e9d3`) -- acceptance gate passed
 
-Per the approved sequence: intro's 4-beat storyboard first (`docs/ART_DIRECTION.md` section 4's table,
-`intro_fault_line33.json` fixture already generated for beat 4), measure frame pacing on the production
-build against the kill criteria (section 4's table) before chapters 2-6, each with reduced-motion
-fallback built alongside (not after) since the skeleton's current state already IS the reduced-motion
-end state for every chapter (no motion exists yet to reduce). Remaining P2/P3 items from the independent
-review (visible status plate, chapterDivergence.test.ts going through the real reducer, LabStub-specific
-issues now moot since LabStub is gone, Worker termination on unmount) still tracked, land alongside
-chapter work. Portrait-specific NetworkView layouts exist (`orientation="portrait"` prop, camera support)
-but are not yet WIRED INTO the chapter shell's tablet/mobile CSS breakpoints -- next concrete gap once
-chapter 1's motion pass needs them.
+Per the "SHARED GSAP LIFECYCLE, CINEMATIC ORCHESTRATION" directive: built the shared motion
+infrastructure FIRST, verified it with a real vertical slice (intro beat 1), before proceeding to the
+remaining beats/chapters -- and that vertical slice did NOT pass cleanly on the first attempt. Six real
+bugs found and fixed, each reproduced with a failing test (vitest or real-browser e2e) before being
+fixed, not shipped on inspection alone:
+
+1. `@gsap/react@2.1.2`'s own StrictMode handling left a duplicate ScrollTrigger behind under this
+   project's React 19.3.0, confirmed via an isolated repro. Fixed in `useScene` (`src/scenes/useScene.ts`):
+   every scene's setup() is idempotent, killing any ScrollTrigger already tagged with its id first.
+2. `useGSAP`'s unmount cleanup calls `context.revert()`, which -- traced directly in
+   `node_modules/gsap/gsap-core.js` -- takes a "soft revert" branch that does NOT remove a tracked
+   ScrollTrigger from the registry. `useScene` has its own explicit unmount cleanup that `.kill()`s
+   tagged triggers directly, verified working.
+3. A scene's layout effect can run before a DOM node ELSEWHERE in the same commit has its ref attached
+   (confirmed twice independently, not just a JSX-ordering mistake -- reproduced again in total
+   isolation after the first fix). `useScene` now retries via `requestAnimationFrame` if its scope ref
+   isn't ready. App.tsx also documents the specific JSX-ordering fix this forced (`IntroBeat1` must
+   render after the `<section id="intro">` it references).
+4. Intro beat 1's blackout opacity was originally set via plain `gsap.set()` OUTSIDE the
+   ScrollTrigger-driven timeline -- reversing the timeline (on scrolling away) had nothing to reverse
+   those sets to, leaving every non-hero bus permanently stuck invisible. Fixed by moving the blackout
+   into the timeline via `.fromTo()`.
+5. Even with that fix, a RAPID/instant scroll straight past the intro to chapter 6 still left the
+   network stuck invisible -- ScrollTrigger's own `toggleActions` enter/leave pairing didn't reliably
+   resolve for an instant jump with no real scroll "velocity" (confirmed `fastScrollEnd: true` alone did
+   not fix it either). Redesigned: beat 1 is now driven directly by `active`
+   (`useActiveChapter`'s own hardened IntersectionObserver detection) instead of a second, competing
+   scroll-position mechanism -- deterministic convergence regardless of how the user got there.
+6. My own first e2e test for "no duplicate solver Worker" had the wrong expected count (the test asserted
+   1 Worker would be created by scrolling alone; the correct, verified behavior is 0 -- the Worker is
+   lazily created only on a real user action). Caught by actually running the test against working code
+   and noticing the assertion was backwards, not by assuming it should pass.
+
+**New infrastructure, reusable by every future chapter:** `src/scenes/gsapSetup.ts` (one-time plugin
+registration), `src/scenes/useScene.ts` (the shared lifecycle wrapper above), `src/scenes/
+presentationCamera.ts` (centralized camera ownership: `claimCamera(ownerId, activeChapterId, camera)`
+silently drops writes from a non-active scene, `resetCameraToDefault` runs on every chapter change before
+that chapter's own scene can claim anything -- not yet wired to any REAL camera movement, since no
+chapter has scroll-scrubbed camera work yet yet; chapters 2/3 are the ones that will need it, per
+ART_DIRECTION.md's motion table).
+
+Test counts as of `007e9d3`: 49/49 vitest, 55/55 e2e (6 new motion-specific, `reducedMotion:
+"no-preference"` opted in explicitly), 32/32 pytest, clean build.
+
+**Not yet done:** beats 2-4 of the intro storyboard (lines assembling via stroke-dashoffset, demand
+pulses, the fault interrupt swapping to `intro_fault_line33.json`), SKIP INTRO control, the FIG index's
+own entry animation, and all 6 chapters' real choreography (camera scrub for 2/3, the single-tween
+fracture for 4, the step-driven comparison for 5, result-driven feedback for 6). Frame-pacing measurement
+against ART_DIRECTION.md's kill criteria has NOT been done yet -- do this once beat 1-4 and at least one
+chapter's glow-filter-under-transform case exist, not before (measuring a single opacity/filter tween in
+isolation wouldn't be representative). Portrait-specific NetworkView layouts exist (`orientation=
+"portrait"` prop, camera support) but are not yet wired into the chapter shell's tablet/mobile CSS
+breakpoints. Remaining P2/P3 items from the earlier independent review (visible status plate,
+chapterDivergence.test.ts going through the real reducer, Worker termination on unmount) still tracked,
+land alongside chapter work.
 
 ## Resume point if this session ends mid-chapter-work
 
 Check `git log --oneline -10` for the most recent commit, and re-read this file plus
-`docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` by then. The chapter shell skeleton (static layout,
-every control in its real chapter, persistent stage) is built and verified. GSAP/scroll motion has not
-started -- begin with the intro's 4-beat storyboard, per `docs/ART_DIRECTION.md` section 4.
+`docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` and `docs/ART_DIRECTION.md` section 4 (storyboard/motion
+table) by then. The shared GSAP lifecycle layer and intro beat 1 are built, verified, and committed
+(`007e9d3`) -- this is the pattern every subsequent scene should follow (`useScene`, not raw
+`useGSAP`/`ScrollTrigger`). Continue with intro beats 2-4, then chapter 1, then chapters 2-6 in order,
+each verified (vitest + real-browser e2e + screenshots) and committed before moving to the next, per the
+"CINEMATIC ORCHESTRATION" directive's phase 7-8.
