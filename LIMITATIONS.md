@@ -52,16 +52,6 @@ one is also noted inline, in the source file closest to the decision, at the tim
 - **No mobile bottom-sheet pattern.** `ART_DIRECTION.md`'s responsive table calls for a bottom-sheet
   control pattern in chapters 2, 3, 5, and 6 at mobile widths; none exists yet -- controls currently just
   reflow into the normal mobile column layout.
-- **Intro title/network overlap at one specific desktop scroll position (P2, cosmetic).** An
-  independent review found that, under `prefers-reduced-motion: reduce`, scrolling naturally (not
-  jumping via the FIG index) to a position partway through the intro section at desktop width briefly
-  shows the "CASCADIA" title text overlapping the network's own glyphs before the chapter 1 handoff
-  settles. Confirmed real (not a scroll-test artifact -- two other apparent overlaps the same review
-  flagged, at tablet chapter 2 and desktop chapter 4, were investigated and found to be artifacts of
-  how the test itself scrolled, and discarded). Left undone this pass: it is a brief, reduced-motion-only,
-  one-breakpoint visual overlap during a transient scroll position, not a functional or data-correctness
-  defect, and the two structural P1s (chapter 6's layout, the stale `compareRestoration.spec.ts`
-  isolation test) took priority within this pass's scope.
 
 ## Performance measurement
 

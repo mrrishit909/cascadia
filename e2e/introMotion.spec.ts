@@ -136,3 +136,36 @@ test("no solver Worker is created merely by scrolling through the intro and chap
   const count = await page.evaluate(() => (window as unknown as { __workerCount: number }).__workerCount);
   expect(count).toBe(0); // lazily created only on a real solve; scrolling alone must never trigger one
 });
+
+test.describe("intro title plate (reduced motion, default project setting)", () => {
+  test.use({ reducedMotion: "reduce" });
+
+  // REGRESSION: an independent review found the "CASCADIA" title/subhead sitting directly on the
+  // transparent stage with no backing, overlapping network bus glyphs across a wide natural-scroll
+  // range through the intro section under reduced motion (not a one-frame artifact -- confirmed by
+  // sweeping real scroll positions, not assumed from a single screenshot). Fixed with an opaque
+  // `.intro-title-plate` wrapper (experience.css), matching chapter 1's own LegendPlate pattern --
+  // the plate legitimately sitting over network geometry is fine (same as chapter 1's legend and
+  // chapter 6's inspector rail), what must never happen again is the TEXT having no opaque backing,
+  // so this checks the plate stays opaque and above the stage (z-index) across the same scroll sweep
+  // that reproduced the original defect, not that it avoids the network's own bounding boxes.
+  test("the title plate stays opaque and above the stage across a natural scroll sweep", async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto("/");
+    const docHeight = await page.evaluate(() => document.body.scrollHeight);
+    const plate = page.locator(".intro-title-plate");
+    let sawPlate = false;
+    for (let y = 0; y < Math.min(docHeight, 2200); y += 200) {
+      await page.evaluate((yy) => window.scrollTo(0, yy), y);
+      await page.waitForTimeout(80);
+      const box = await plate.boundingBox();
+      if (!box) continue; // not yet in flow/visible at this scroll position
+      sawPlate = true;
+      const bg = await plate.evaluate(el => getComputedStyle(el).backgroundColor);
+      expect(bg).not.toBe("rgba(0, 0, 0, 0)"); // opaque, not the original transparent text-on-stage
+      const z = await plate.evaluate(el => Number(getComputedStyle(el).zIndex));
+      expect(z).toBeGreaterThanOrEqual(2); // above .stage-sticky's own z-index (1)
+    }
+    expect(sawPlate).toBe(true); // the sweep actually passed through the intro section at least once
+  });
+});

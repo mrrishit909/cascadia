@@ -97,34 +97,22 @@ test("interrupted transition: leaving chapter 6 while a solve is still in flight
   await expect(page.locator(".stage-inner")).toHaveCSS("opacity", "1");
 });
 
-test.describe("layout: inspector rail is opaque and never scrolls loose over the network", () => {
+test.describe("layout: inspector rail is opaque, flush right, anchored, and clears the network", () => {
   // REGRESSION for an independent-review P1: chapter 6 shipped with zero ch6-specific CSS, so its 7
   // full-size control cards sat in normal document flow at the section's own left edge, transparent,
   // and scrolled up over the full-bleed sticky network's own drawn graph for the section's entire
-  // length, at every breakpoint. At DESKTOP, ART_DIRECTION.md's own row 6 literally specifies "a
-  // fixed 384px inspector rail on the right" OVER the full-bleed network (the "immersive canvas with
-  // anchored inspector" archetype) -- so the rail legitimately covering part of the drawn graph there
-  // is correct, by design, not a regression; what the fix must guarantee instead is that the rail is
-  // opaque (so covered content doesn't visually bleed through, unlike the original transparent cards)
-  // and anchored (sticky/fixed, not loose in document flow). At TABLET/MOBILE the spec's own responsive
-  // table has no such overlay allowance, so the stacked-below layout there must have zero overlap with
-  // the network, checked against a real bus element's measured position.
-  test("desktop: the rail is opaque and anchored, not a loose transparent card", async ({ page }) => {
-    await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto("/");
-    await page.getByRole("link", { name: "FIG. 06" }).click();
-    await page.waitForFunction(() => document.querySelector(".stage-sticky")?.getAttribute("data-active-chapter") === "ch6");
-    await page.waitForTimeout(300);
-    const rail = page.locator("#ch6 .chapter-controls-column");
-    await expect(rail).toHaveCSS("position", "sticky");
-    const bg = await rail.evaluate(el => getComputedStyle(el).backgroundColor);
-    expect(bg).not.toBe("rgba(0, 0, 0, 0)"); // opaque, not the default transparent
-    const box = await rail.boundingBox();
-    expect(box).not.toBeNull();
-    if (box) expect(box.x + box.width).toBeLessThanOrEqual(1440); // stays within the viewport, doesn't run off-page
-  });
-
+  // length, at every breakpoint. ART_DIRECTION.md's own row 6 specifies "a fixed 384px inspector rail
+  // on the right" -- flush to the real viewport edge, not covering interactive network content past
+  // that 384px strip. A second real regression (caught by an advisor review of THIS fix, not assumed
+  // correct from screenshots alone): `main`'s own horizontal padding (sp-9, 96px) plus
+  // `.chapter-section`'s own (sp-8, 64px) stacked, leaving the rail 160px short of the real edge AND
+  // covering a bus (26) that a flush rail would have cleared -- fixed with a cancelling negative
+  // margin, and the chapter title was moved inside the rail as its own header (matching chapter 1's
+  // legend-plate pattern) since it previously sat where the rail now needs clear space. Checked here
+  // against real bus elements' measured positions, at all 3 required breakpoints -- zero overlap is
+  // required everywhere, not just tablet/mobile, now that the rail is flush rather than mid-canvas.
   for (const [name, viewport] of [
+    ["desktop", { width: 1440, height: 900 }],
     ["tablet", { width: 768, height: 1024 }],
     ["mobile", { width: 390, height: 844 }],
   ] as const) {
@@ -139,9 +127,16 @@ test.describe("layout: inspector rail is opaque and never scrolls loose over the
       await page.getByRole("link", { name: "FIG. 06" }).click();
       await page.waitForFunction(() => document.querySelector(".stage-sticky")?.getAttribute("data-active-chapter") === "ch6");
       await page.waitForTimeout(300);
-      const controlsBox = await page.locator("#ch6 .chapter-controls-column").boundingBox();
+      const rail = page.locator("#ch6 .chapter-controls-column");
+      const bg = await rail.evaluate(el => getComputedStyle(el).backgroundColor);
+      expect(bg).not.toBe("rgba(0, 0, 0, 0)"); // opaque, not the original transparent card
+      const controlsBox = await rail.boundingBox();
       expect(controlsBox).not.toBeNull();
       if (!controlsBox) return;
+      if (name !== "mobile" && name !== "tablet") {
+        // desktop: rail must be flush to the real viewport edge, not left short by `main`/section padding
+        expect(Math.round(controlsBox.x + controlsBox.width)).toBe(viewport.width);
+      }
       const buses = page.locator('[data-testid="bus"]');
       const count = await buses.count();
       expect(count).toBeGreaterThan(0);

@@ -92,6 +92,26 @@
 .chapter-section > * { pointer-events: auto; }
 .chapter-section[data-archetype="immersive"] { justify-content: flex-end; }
 
+/* Intro ("CASCADIA" title + subhead, IntroSequence.tsx): a real, reproducible defect (P2, not a
+   one-frame artifact as first assumed -- confirmed by screenshotting a real natural scroll sweep
+   under reduced motion, which showed the title overlapping bus glyphs across a wide scroll range,
+   not a single transient frame). The title/prose sat directly on the transparent stage with no
+   backing, the same collision class already fixed once for chapter 1's own title via LegendPlate's
+   opaque plate. Same fix here: an opaque bounded plate behind the text, positioned bottom-left per
+   this chapter's own `justify-content:flex-end` archetype, so it reads clearly regardless of what
+   network geometry sits behind it at any given scroll position. */
+.intro-title-plate {
+  position: relative;
+  z-index: 3;
+  display: inline-block;
+  max-width: 640px;
+  background: var(--surface);
+  border: var(--border-hairline);
+  padding: var(--sp-5);
+}
+.intro-title-plate h1 { margin: 0 0 var(--sp-2); }
+.intro-title-plate .chapter-prose { margin: 0; }
+
 /* Chapter 2's scroll-scrub (Chapter2Scene.tsx) needs real scroll DISTANCE to traverse 0-1 progress
    while still being the chapter useActiveChapter's own IntersectionObserver considers dominant --
    the default 100vh section left too little runway, and the scrub's own end point had to be moved
@@ -150,6 +170,18 @@
   border-left: var(--border-hairline);
   padding: var(--sp-5);
   margin: 0;
+  /* Flush to the real viewport's right edge, not `main`'s own padded content box: without this, both
+     `main`'s horizontal padding (sp-9, 96px) AND `.chapter-section`'s own (sp-8, 64px) stack, leaving a
+     160px dead gap AND pushing the rail 160px further left over the network than the "right edge" the
+     spec calls for -- found via measured boundingBox x/width, not assumed. */
+  margin-right: calc(-1 * (var(--sp-9) + var(--sp-8)));
+}
+@media (max-width: 1279px) and (min-width: 1024px) {
+  /* `main`'s own breakpoint (max-width:1279px) drops its horizontal padding to sp-7 (48px) before
+     ch6's own narrow-width reset fires at 1023px -- the cancelling margin must match whichever of
+     `main`'s own two desktop padding values is active, or it either overshoots (visible gap) or
+     undershoots (rail or page overflows) in this one range. */
+  #ch6 .chapter-controls-column { margin-right: calc(-1 * (var(--sp-7) + var(--sp-8))); }
 }
 @media (max-width: 1023px) {
   /* Unlike chapters 2/4, ch6's own network stays FULL-bleed (width:100%, no height:55vh strip --

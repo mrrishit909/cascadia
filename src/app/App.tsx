@@ -158,8 +158,10 @@ export function Scene() {
       </div>
 
       <section id="intro" ref={introRef} className="chapter-section" data-archetype="immersive">
-        <h1>CASCADIA</h1>
-        <p className="chapter-prose">An electrical grid, reconstructed under computed flow constraints.</p>
+        <div className="intro-title-plate">
+          <h1>CASCADIA</h1>
+          <p className="chapter-prose">An electrical grid, reconstructed under computed flow constraints.</p>
+        </div>
       </section>
       {/* Rendered AFTER the intro <section> deliberately, not just stylistically: React attaches refs
           and runs layout effects interleaved in JSX sibling order within the same commit, not "every ref
@@ -223,8 +225,8 @@ export function Scene() {
       </section>
 
       <section id="ch6" className="chapter-section" aria-label="Scenario laboratory">
-        <ChapterTitle sceneId="title-ch6" active={active === 'ch6'}>FIG. 06 &mdash; Scenario laboratory</ChapterTitle>
         <div className="chapter-controls-column">
+          <ChapterTitle sceneId="title-ch6" active={active === 'ch6'}>FIG. 06 &mdash; Scenario laboratory</ChapterTitle>
           <RemoveNode placement="lab" />
           <AlterCapacity placement="lab" />
           <IncreaseLoad placement="lab" />
