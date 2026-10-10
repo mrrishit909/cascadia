@@ -823,28 +823,96 @@ worst of them) was invisible to a quick glance and only surfaced by checking act
 a genuinely independent review, or the full suite -- never assumed from reading the code or trusting
 one chapter's own green tests in isolation.
 
-Continue with chapter 5 ("recovery plans": comparative view -- three equal columns, one per
-restoration sequence from CAS-INT-006's own fixture, each a mini network plus a served-MW step chart on
-a SHARED y-axis, ranked by served energy, a step control advancing all three in sync). Per
-CHAPTER_ARCHITECTURE.md section 2's own resolution, chapter 5 is the ONLY chapter where the main
-persistent stage is inert (`.stage-sticky[data-active-chapter="ch5"] { opacity: 0; pointer-events: none
-}`, already in `experience.css`) -- the three mini networks are a SEPARATE, non-interactive render
-variant of the same `NetworkView` encoding (it already has an `interactive: boolean` prop and
-`mini-bus`/`mini-line` testids for exactly this, per earlier chapter-shell work -- read `NetworkView.tsx`
-before assuming new rendering code is needed). `CompareRestoration.tsx` already computes the real
-ranked orders; this pass is about: (1) rendering 3 real mini `NetworkView`s side by side from that
-data, (2) the step index-driven motion table row (trigger: "User presses STEP / selects a sequence, not
-scroll"; "All three columns share one step index and one timeline"; reduced motion: "Instant step"), and
-(3) the shared-y-axis step chart ART_DIRECTION.md describes. Then chapter 6 (laboratory: "Any control
-commit, then Worker result" drives "last result dims to 60% while solving, then all changed elements
-transition together on result" -- feedback timing hooks into the EXISTING `state.solve` status machine,
-not new analytical work). Each verified (vitest + e2e covering entry/midpoint/exit/forward/reverse/
-instant-jump/interrupted/reduced-motion/analytical-preservation + a live-control-during-motion scenario
-+ real screenshots at all 3 breakpoints, actually read, AND the full suite re-run) and committed before
-moving to the next. After chapter 6: the full-suite frame-pacing pass across all 6 chapters' heaviest
-interactions together (chapter 3's own measurement is isolated, not a substitute), then an independent
-adversarial review in an isolated worktree per the directive's phase 6, then final release readiness
-per phase 8. Do not claim performance compliance or final acceptance without that evidence.
+## Chapter 5 ("Recovery plans") landed
+
+Comparative view: three equal columns, one per top-ranked restoration sequence from CAS-INT-006's own
+`state.restoration.ranking` (never a second, duplicated ranking computation), each a mini `NetworkView`
+plus a served-MW step chart on a shared y-axis, a step control advancing all three in sync.
+`NetworkView.tsx` already had `interactive: boolean` reserved for exactly this per earlier chapter-shell
+work, confirmed by reading it before writing anything new.
+
+**A real, additive architecture extension, not a redesign**: `removedBus` only ever supported ONE bus,
+but a restoration scenario's `down` set can include MULTIPLE buses at once (the 'two_buses' preset).
+Added `removedBuses?: number[]` to `NetworkView`'s props, unioned with the singular `removedBus`
+everywhere it's checked (both the bus-removed flag and every line-adjacency "dead" check) -- backward-
+compatible (defaults to `[]`), verified against the full suite before trusting it (97/97 e2e passed with
+the extension in place, before chapter 5's own code even used it).
+
+**An honesty call made explicit, not silently approximated**: `RestoreStep` (the real per-step data)
+only carries AGGREGATE `served_mw`/`unserved_mw`, no per-bus or per-line detail -- there is no way to
+know which SPECIFIC bus is shed at an intermediate restoration step without re-solving it (out of
+scope). Rather than borrow baseline or live flow/shed data to fill in the mini networks (which would
+show plausible-looking but WRONG per-bus detail for a scenario that was never actually solved at that
+granularity), each mini network gets a minimal, honest `EMPTY_RESULT` (empty shed/islands/flows/
+binding_lines) -- it shows ONLY the one thing actually known (which `down` elements are still down,
+via `removedBuses`/`disabledLines`, derived from `RestoreSeq.order`/`steps[].restored`, which are
+INDICES into the preset's own `down` array, not raw ids -- confirmed by reading `engine/dcopf.ts`'s own
+`restorationSequence` comment before assuming the semantics). The real aggregate number is shown
+separately and accurately in the step chart/label.
+
+Step advance is plain React state (`useState`), not a GSAP scene: the motion table's own trigger for
+this chapter is "User presses STEP... not scroll," discrete and user-driven, closer to a feedback
+transition than continuous motion -- a CSS `transition: height 480ms` on each step-chart bar (matching
+the table's "state 480ms" row) is the whole motion surface, disabled under `prefers-reduced-motion`
+same as every other CSS-transition-driven chrome element in this app.
+
+Verified: the empty-state prompt before Compare has run (never fabricated columns), real ranked data
+after Compare (step 0 shows IDENTICAL served MW across all 3 columns -- the same fault, before any
+restoration, a real cross-check), the step control advancing/reversing/resetting all 3 columns in
+lockstep, the final step matching each order's own `final_served_mw`, switching the fault-scenario
+preset correctly reverting to the empty prompt (not stale columns from the old scenario), analytical-
+state preservation (no Worker from scrolling alone -- CompareRestoration's own Worker is lazy, created
+only on Compare), and reduced motion (instant bar transitions) -- `e2e/chapter5.spec.ts`, 7 tests. A
+dedicated axe-core pass over the populated comparison (3 real mini networks + step chart) found zero
+violations. Real screenshots at all 3 breakpoints: `verification/SCREENSHOTS/ch5-desktop-1440x900-
+empty.png`, `ch5-desktop-1440x900-step2.png`, `ch5-tablet-768x1024.png`, `ch5-mobile-390x844.png`.
+
+Test counts: 61/61 vitest, 105/105 e2e (+7 chapter5, +1 a11y), 32/32 pytest, clean build -- full suite
+re-run before committing, per the lesson chapter 4 forced.
+
+## Resume point if this session ends mid-chapter-work
+
+Check `git log --oneline -10` for the most recent commit, and re-read this file plus
+`docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` and `docs/ART_DIRECTION.md` section 4 (storyboard/motion
+table) by then. The shared GSAP lifecycle layer, the FULL intro sequence, `ChapterTitle`, and chapters
+1-5 are built, reviewed, verified, and committed. Only chapter 6 (the laboratory) remains before
+production performance measurement, independent review, and final acceptance.
+
+Continue with chapter 6 ("scenario laboratory": immersive canvas with an anchored inspector rail,
+ALREADY functionally complete -- it hosts all 7 controls at their `placement="lab"` mount and the stage
+is already always-live there, per `App.tsx`'s own existing story/lab switch). This pass is motion-only,
+per the motion table's row 6: trigger "Any control commit, then Worker result" drives "last result dims
+to 60% while solving, then all changed elements transition together on result" (feedback 240ms, state
+480ms) -- hook into the EXISTING `state.solve` status machine (`'idle'|'solving'|'error'`, already
+driving `StatusRegion`/`RestorationStatusRegion`), dimming the stage to 60% opacity while `solve===
+'solving'` and restoring it (with whatever changed elements the new result implies) once it resolves.
+This is NOT new analytical work and does not need a new `ScrollTrigger`/one-shot timeline pattern --
+it's a `useScene` scene (or even a plain CSS rule keyed on a `data-solving` attribute) reacting to
+`active==='ch6'` plus `state.solve`, the simplest of the 6 chapters' own motion requirements. Verify a
+live-control-during-motion scenario (the user's own standing concern from chapter 3, equally relevant
+here): triggering a SECOND control change while the first's dim/restore feedback is still in flight
+must not corrupt the feedback state or drop the newer result (this app's own existing concurrency
+protections, e2e/concurrency.spec.ts, already cover the ANALYTICAL side of this -- chapter 6's own new
+test should confirm the VISUAL feedback doesn't fight itself under the same conditions). Each chapter
+verified (vitest + e2e covering entry/midpoint/exit/forward/reverse/instant-jump/interrupted/reduced-
+motion/analytical-preservation/live-control-during-motion + real screenshots at all 3 breakpoints,
+actually read, AND the full suite re-run) and committed.
+
+After chapter 6: the full-suite frame-pacing pass across all 6 chapters' heaviest interactions together
+(chapter 3's own measurement is isolated, not a substitute -- chapter 4's fracture and chapter 6's own
+node-removal case, both flagged as still owed their own measurement, are the natural candidates for the
+"heaviest interaction" this final pass should target), then an independent adversarial review in an
+isolated worktree per the directive's phase 6 (given this session's own track record -- 2 serious
+architecture bugs found in self-review, 1 of them this project's worst defect yet -- a genuinely
+independent reviewer should be expected to find more, not treated as a formality), then final release
+readiness per phase 8: full requirement-coverage pass against `specifications/REQUIREMENTS.yaml`'s
+CAS-MOTION-001/CAS-RELEASE-001 rows (both still `unstarted`/`in progress` as of the last read), the
+parent portfolio directive's doc-file list (README/ARCHITECTURE/VISUAL_DESIGN/MOTION_SYSTEM/
+DATA_SOURCES/TESTING/LIMITATIONS/DEPLOYMENT.md -- check which exist already vs. still need writing),
+and `LIMITATIONS.md` updated to include every deliberate simplification documented across chapters 3-5
+(chapter 3's own-rating-normalized bars, chapter 5's `EMPTY_RESULT` per-step mini networks). Do not
+claim performance compliance, requirement completion, or final acceptance without that evidence. Do not
+deploy or publish externally without explicit authorization.
 
 **Shared work still unbuilt, tracked here rather than silently dropped:** a mobile bottom-sheet pattern
 for controls (chapters 2/3/5/6 all need one per ART_DIRECTION.md's responsive table; none exists yet).

@@ -4,7 +4,10 @@ import type { DownElement } from '../engine/dcopf'
 
 // CAS-INT-006. Presets mirror research/evaluate/add_line_restoration.py's RESTORE dict exactly (pinned
 // by e2e/compareRestoration.spec.ts against verification/REFERENCE_RESULTS/add_line_restoration.json).
-const PRESETS: { id: string; label: string; down: DownElement[] }[] = [
+// Exported for Chapter5Comparison.tsx: it needs each preset's own `down` set to know which elements
+// are still "down" at a given restoration step (CAS-INT-006's own `order`/`steps[].restored` are
+// indices into THIS array, not raw bus/line ids) -- the single source of truth, never duplicated.
+export const PRESETS: { id: string; label: string; down: DownElement[] }[] = [
   { id: 'island_pocket_plus_line9', label: 'Island pocket + line 9 (3 down)', down: [{ kind: 'line', id: 36 }, { kind: 'line', id: 37 }, { kind: 'line', id: 9 }] },
   { id: 'bus_and_lines', label: 'Bus 26 + two lines (3 down)', down: [{ kind: 'bus', id: 26 }, { kind: 'line', id: 34 }, { kind: 'line', id: 9 }] },
   { id: 'two_buses', label: 'Two buses (2 down)', down: [{ kind: 'bus', id: 11 }, { kind: 'bus', id: 26 }] },

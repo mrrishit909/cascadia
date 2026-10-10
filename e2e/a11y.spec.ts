@@ -36,6 +36,18 @@ test("axe-core: chapter 4's fault ledger has zero violations", async ({ page }) 
   expect(results.violations).toEqual([]);
 });
 
+test("axe-core: chapter 5's comparison columns (3 mini networks + step chart) have zero violations", async ({ page }) => {
+  await page.goto("/");
+  await scrollToChapter(page, "ch5");
+  await controlHome(page, "Compare restoration").getByRole("button", { name: "Compare" }).click();
+  await expect(page.locator('[data-testid="ch5-column"]')).toHaveCount(3, { timeout: 5000 });
+  const results = await new AxeBuilder({ page }).analyze();
+  if (results.violations.length) {
+    console.log(JSON.stringify(results.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, help: v.help })), null, 1));
+  }
+  expect(results.violations).toEqual([]);
+});
+
 // Architecture-stabilization regression: RemoveNode/AlterCapacity/ScenarioReadout used to each carry
 // their own role="status"/role="alert" element, so a single solve fired up to 6 duplicate screen-reader
 // announcements. StatusRegion/RestorationStatusRegion (App.tsx) are now the ONLY live-announcing

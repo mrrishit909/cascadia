@@ -138,7 +138,14 @@ function busBrackets(key: string) {
   ))
 }
 
-interface Props { network: Case30; result: SolveResult; removedBus?: number | null; selectedBus?: number | null; onSelect?: (bus: number) => void; selectedLine?: number | null; onSelectLine?: (line: number) => void; alteredLines?: number[]; disabledLines?: number[]; onRestoreLine?: (line: number) => void; candidates?: CandidateLine[]; addedLines?: number[]; onToggleCandidate?: (pos: number) => void
+interface Props { network: Case30; result: SolveResult; removedBus?: number | null
+  // Chapter 5's restoration mini-networks (CAS-INT-006): a restoration scenario's `down` set can
+  // include MULTIPLE buses at once (e.g. the 'two_buses' preset), which the singular `removedBus`
+  // (every other chapter's own single-bus-removal controls never need more than one at a time) can't
+  // express. Additive, backward-compatible: unions with `removedBus` for the "removed" check below,
+  // defaults to empty so every existing caller is unaffected.
+  removedBuses?: number[]
+  selectedBus?: number | null; onSelect?: (bus: number) => void; selectedLine?: number | null; onSelectLine?: (line: number) => void; alteredLines?: number[]; disabledLines?: number[]; onRestoreLine?: (line: number) => void; candidates?: CandidateLine[]; addedLines?: number[]; onToggleCandidate?: (pos: number) => void
   // docs/planning/cascadia/CHAPTER_ARCHITECTURE.md section 2: "one persistent stage" means the one
   // CANONICAL interactive instance. Chapter 3's locator inset and chapter 5's mini networks are a
   // separate presentational variant of the SAME lineVisual/color/glow logic, not a hand-rolled second
@@ -161,7 +168,7 @@ interface Props { network: Case30; result: SolveResult; removedBus?: number | nu
   // `project()` box/rotation is used; the resulting coordinate space is PORTRAIT_W x PORTRAIT_H instead
   // of W x H, so a `camera` passed alongside `orientation="portrait"` must be expressed in THAT space.
   orientation?: 'landscape' | 'portrait' }
-export function NetworkView({ network, result, removedBus = null, selectedBus = null, onSelect, selectedLine = null, onSelectLine, alteredLines = [], disabledLines = [], onRestoreLine, candidates = [], addedLines = [], onToggleCandidate, interactive = true, camera, orientation = 'landscape' }: Props) {
+export function NetworkView({ network, result, removedBus = null, removedBuses = [], selectedBus = null, onSelect, selectedLine = null, onSelectLine, alteredLines = [], disabledLines = [], onRestoreLine, candidates = [], addedLines = [], onToggleCandidate, interactive = true, camera, orientation = 'landscape' }: Props) {
   const reactId = useId()
   const boxW = orientation === 'portrait' ? PORTRAIT_W : W
   const boxH = orientation === 'portrait' ? PORTRAIT_H : H
@@ -241,6 +248,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
   // object standing in for "zero". See verification/NO_FAKE_NUMBERS_AUDIT.md #6 / PROTOTYPE_REPORT.md D2.
   const infeasible = result.status === 'infeasible'
   const noGen = useMemo(() => new Set(result.islands.filter(i => i.kind === 'shed_no_generation').flatMap(i => i.buses)), [result])
+  const isRemovedBus = (b: number) => b === removedBus || removedBuses.includes(b)
   const pos = useMemo(() => project(network, orientation === 'portrait'), [network, orientation])
   // networkEncoding.loadServed: per-bus demand, for the load chevron glyph. `loadByBus`/`maxLoadMw` are
   // from the NETWORK's own fixed demand data (network.loads), not scaled by the live result -- the
@@ -263,7 +271,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
     if (infeasible) return [] as { x1: number; y1: number; x2: number; y2: number; stroke: string; width: number }[]
     const out: { x1: number; y1: number; x2: number; y2: number; stroke: string; width: number }[] = []
     for (const l of network.lines) {
-      if (l.from_bus === removedBus || l.to_bus === removedBus || disabledLines.includes(l.idx)) continue
+      if (isRemovedBus(l.from_bus) || isRemovedBus(l.to_bus) || disabledLines.includes(l.idx)) continue
       const deEnergized = noGen.has(l.from_bus) || noGen.has(l.to_bus)
       const f = Math.abs(result.flows[l.idx] ?? 0)
       const rating = result.line_rating_mw[l.idx] ?? l.rating_mw
@@ -276,7 +284,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
     candidates.forEach((cl, k) => {
       if (!addedLines.includes(k)) return
       const idx = network.lines.length + k
-      const deEnergized = cl.from_bus === removedBus || cl.to_bus === removedBus || noGen.has(cl.from_bus) || noGen.has(cl.to_bus)
+      const deEnergized = isRemovedBus(cl.from_bus) || isRemovedBus(cl.to_bus) || noGen.has(cl.from_bus) || noGen.has(cl.to_bus)
       const f = Math.abs(result.flows[idx] ?? 0)
       const rating = result.line_rating_mw[idx] ?? cl.rating_mw
       const binding = result.binding_lines.includes(idx)
@@ -286,7 +294,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
       out.push({ x1: a.x, y1: a.y, x2: b.x, y2: b.y, stroke: v.stroke, width: 1 + 4 * f / maxFlow })
     })
     return out
-  }, [network, result, removedBus, disabledLines, candidates, addedLines, infeasible, noGen, pos, maxFlow])
+  }, [network, result, removedBus, removedBuses, disabledLines, candidates, addedLines, infeasible, noGen, pos, maxFlow])
 
   // Unique per mount: docs/ART_DIRECTION.md puts a locator inset (chapter 3) and small-multiple mini
   // networks (chapter 5) alongside the main stage, i.e. more than one <svg> with this filter on the
@@ -330,7 +338,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
         {network.lines.map(l => {
           const a = pos[l.from_bus], b = pos[l.to_bus]
           const outaged = disabledLines.includes(l.idx) // distinct from bus-removal adjacency: this one is independently restorable
-          const dead = l.from_bus === removedBus || l.to_bus === removedBus || outaged
+          const dead = isRemovedBus(l.from_bus) || isRemovedBus(l.to_bus) || outaged
           // Restorable (outaged, not merely adjacent to a removed bus) lines stay keyboard/click-interactive
           // so a line taken out via LineOutage can be put back from the SVG, not only its <select>.
           // networkEncoding.removedElement: deEnergized stroke, dash "1 3" -- fault red means ONLY infeasible.
@@ -394,7 +402,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
           const rating = result.line_rating_mw[idx] ?? cl.rating_mw
           // Added candidates are real topology now: same deEnergized check (removed-bus-adjacent or
           // inside a no-generation island) as any base line, not a special case.
-          const deEnergizedCand = cl.from_bus === removedBus || cl.to_bus === removedBus || noGen.has(cl.from_bus) || noGen.has(cl.to_bus)
+          const deEnergizedCand = isRemovedBus(cl.from_bus) || isRemovedBus(cl.to_bus) || noGen.has(cl.from_bus) || noGen.has(cl.to_bus)
           const v = lineVisual(f, rating, binding, deEnergizedCand)
           const width = 1 + 4 * f / maxFlow
           return <g key={`cand-${k}`} data-testid={candTestid} data-candidate={k} data-added="true" data-binding={binding ? 'binding' : 'slack'}
@@ -408,7 +416,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
       </g>
       <g>
         {network.buses.map(b => {
-          const removed = b.idx === removedBus
+          const removed = b.idx === removedBus || removedBuses.includes(b.idx)
           if (!removed && infeasible) {
             return <g key={b.idx} data-testid={busTestid} data-bus={b.idx} data-state="infeasible" transform={`translate(${pos[b.idx].x} ${pos[b.idx].y})`}
               {...hit(`bus:${b.idx}`, `Bus ${b.name}, status n/a (infeasible). Press Enter to select for removal.`, selectedBus === b.idx, () => onSelect?.(b.idx), keyToClick(() => onSelect?.(b.idx)))}>

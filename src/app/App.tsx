@@ -29,6 +29,7 @@ import { BalanceRule } from '../scenes/BalanceRule'
 import { Chapter3Scene } from '../scenes/Chapter3Scene'
 import { CorridorStrip, computeBaselineRails } from '../scenes/CorridorStrip'
 import { Chapter4Scene } from '../scenes/Chapter4Scene'
+import { Chapter5Comparison } from '../scenes/Chapter5Comparison'
 import type { Precomputed, SolveResult } from '../engine/types'
 import '../scenes/experience.css'
 
@@ -217,6 +218,7 @@ export function Scene() {
         <div className="chapter-controls-column">
           <CompareRestoration placement="home" />
         </div>
+        <Chapter5Comparison />
       </section>
 
       <section id="ch6" className="chapter-section" aria-label="Scenario laboratory">
