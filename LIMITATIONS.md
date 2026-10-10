@@ -91,7 +91,8 @@ one is also noted inline, in the source file closest to the decision, at the tim
 
 ## Deployment
 
-- **Not deployed.** This build has not been published to any external host. `DEPLOYMENT.md` documents
-  the build/hosting process and the Pages base-path configuration a real deployment would need, but no
-  deployment or external publish has been performed -- per this project's own standing rule, that
-  requires explicit authorization which has not been given.
+- **Deployed and independently verified** at https://mrrishit909.github.io/cascadia/ (2026-10-10),
+  under explicit authorization. See `verification/CASCADIA_PUBLICATION_REPORT.md`.
+- This repo's `.claude`/`.codex`/agent-tooling files are publicly visible in the GitHub tree, and
+  GitHub lists the sole contributor as "Claude." A presentation choice for the project owner, not a
+  functional or security defect (checked for secrets/credentials; none found).

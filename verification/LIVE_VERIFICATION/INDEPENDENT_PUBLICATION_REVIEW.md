@@ -59,7 +59,11 @@ state observed at any point.
 
 ## Evidence
 
-Screenshots and Playwright scripts: `/tmp/cascadia-qa/` on the reviewer's own session (01-intro.png,
-03-fig04.png, 11-tracked-after.png, 21-portfolio-search-cascadia.png, 22/23 portfolio-to-case-study
-navigation, 24-case-study-full.png, 30-github-repo.png, 40-43 FIG.05 compare evidence, lh.json
-Lighthouse report).
+Key screenshots and the raw Lighthouse report copied into
+`verification/LIVE_VERIFICATION/independent/` (the reviewer's own session wrote its full working set to
+`/tmp/cascadia-qa/`, which is not durable). Includes: `01-intro.png`, `03-fig04.png`
+(outage-cascade state after a solve), `11-tracked-after.png` (bus removed, live LP objective/islands
+shown), `20-portfolio-home.png`, `21-portfolio-search-cascadia.png`, `22-after-click-record.png`,
+`23-case-study-landed.png`, `24-case-study-full.png`, `30-github-repo.png`, `40-fig05-settled.png` /
+`41-fig05-after-compare.png` (restoration comparison), `lh.json` (raw live Lighthouse report). All were
+opened and visually inspected, not just captured.

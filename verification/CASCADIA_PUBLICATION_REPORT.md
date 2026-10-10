@@ -17,7 +17,9 @@ record of publication: where everything lives, what was checked, and by whom.
 ## Deployment commit and workflow
 
 - **Release-candidate commit (evaluated/accepted):** `594d63c`, tagged `release-candidate-594d63c`.
-- **Deployed commit (current live build):** `47c5c46` on `main`.
+- **Live build tracks `main` HEAD**: the deploy workflow runs on every push to `main`, so the live site
+  always serves the latest pushed commit, not a fixed hash. Last verified run: `ffbde36` ->
+  workflow run `38040458047`, completed successfully 2026-10-10T09:10Z (`gh run list`).
 - **Deployment workflow:** `.github/workflows/deploy.yml`, GitHub Actions
   (`actions/checkout`, `actions/setup-node@v4` node 24, `npm ci`, `tsc --noEmit`, `npm run test -- --run`,
   `npm run build`, `actions/upload-pages-artifact@v3`, `actions/deploy-pages@v4`), triggered on every

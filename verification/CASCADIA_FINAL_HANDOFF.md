@@ -7,8 +7,9 @@ evidence and conclusion). This document is the short, practical "what to do next
 
 - **Release-candidate commit:** `594d63c158ea1232347d9586b53e4ee1837eec07` on `main`, tagged
   `release-candidate-594d63c`.
-- **Deployed commit:** `47c5c46` on `main` (base path + title fixed at `4530692`, CI fixed at `a9f0775`,
-  Actions workflow added at `c362093`).
+- **Live build tracks `main` HEAD** (deploy workflow fires on every push): base path + title fixed at
+  `4530692`, CI fixed at `a9f0775`, Actions workflow added at `c362093`. Last verified live run:
+  commit `ffbde36`, workflow run `38040458047`, success.
 - **Conclusion:** ACCEPTED and PUBLISHED. Live app, GitHub repo, and portfolio case study are all up
   and independently verified. See `verification/CASCADIA_PUBLICATION_REPORT.md` for the full record.
 - **Live URL:** https://mrrishit909.github.io/cascadia/

@@ -1,8 +1,10 @@
 # Deployment
 
-**Status: not deployed.** No external publish has been performed. This document describes the build and
-static-hosting process so deployment can proceed quickly once explicitly authorized -- it is not a
-record of an actual deployment.
+**Status: deployed.** Live at https://mrrishit909.github.io/cascadia/ via GitHub Actions
+(`.github/workflows/deploy.yml`), authorized and completed 2026-10-10. See
+`verification/CASCADIA_PUBLICATION_REPORT.md` for the full record (commits, workflow, live smoke-test
+and Lighthouse results, independent review). The steps below remain accurate as the process actually
+used, kept as the reference for any future redeploy.
 
 ## Production build
 

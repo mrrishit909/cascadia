@@ -27,7 +27,7 @@ that is stated explicitly rather than silently corrected.
 | CAS-MATH-001 Oracle correctness | P0 | independently verified |
 | CAS-UX-001 Six controls + parity | P0 | implemented |
 | CAS-MOTION-001 Intro + 6 chapters | P0 | **independently verified** (updated this session, see §4) |
-| CAS-RELEASE-001 Deployment gate | P0 | unstarted (deployment not authorized) |
+| CAS-RELEASE-001 Deployment gate | P0 | **independently verified** (updated 2026-10-10, deployed and publication-reviewed, see §§7-9 and `verification/CASCADIA_PUBLICATION_REPORT.md`) |
 
 All 12 rows have a `status` and `evidence_paths`; none claim "independently verified" without an
 `verification/*_INDEPENDENT_REVIEW.md` file backing it. Two rows carry known, honestly-stated open
