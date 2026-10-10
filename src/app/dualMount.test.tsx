@@ -107,4 +107,29 @@ describe('dual mount: LineOutage (selection lifted to AppState.outageLine)', () 
     fireEvent.change(home.getByLabelText('Line to disable'), { target: { value: '0' } })
     await waitFor(() => expect((lab.getByLabelText('Line to disable') as HTMLSelectElement).value).toBe('0'))
   })
+
+  it('REGRESSION: mounting a second instance while a line is already selected does not steal focus to its trigger button', async () => {
+    // Found by advisor review before this ever shipped in a real chapter shell: the focus-management
+    // effect (confirming -> focus Confirm/trigger) has no initial-mount guard, so it ALSO fires once on
+    // every mount, not just on confirming's later transitions. Since outageLine is shared AppState, a
+    // SECOND mount (chapter's lab placement) while a line is already selected renders that instance's
+    // own "Disable line"/"Restore line" trigger button immediately and the effect's mount-time run
+    // yanks keyboard focus to it -- regardless of what the user was actually doing elsewhere on the page.
+    const { rerender } = await setup(<div data-testid="home"><LineOutage /></div>, "Line outage")
+    const home = within(screen.getByTestId('home'))
+    fireEvent.change(home.getByLabelText('Line to disable'), { target: { value: '0' } })
+    const triggerA = home.getByText('Disable line')
+    triggerA.focus()
+    expect(document.activeElement).toBe(triggerA)
+    const highs = await highsLoader()
+    rerender(
+      <AppProvider solver={async (c, sc, cands) => solveDcopf(c, highs, sc, cands)}>
+        <div data-testid="home"><LineOutage /></div>
+        <div data-testid="lab"><LineOutage /></div>
+      </AppProvider>,
+    )
+    // instance B mounts fresh with outageLine already '0' (shared), so its own trigger button renders
+    // immediately -- focus must stay wherever the user actually put it, not jump to instance B
+    expect(document.activeElement).toBe(triggerA)
+  })
 })

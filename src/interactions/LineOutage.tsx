@@ -29,7 +29,17 @@ export function LineOutage({ placement = 'home' }: { placement?: 'home' | 'lab' 
   // the same bug reached a second way. Deferred via `awaitingTriggerFocus`: if the trigger isn't
   // focusable yet, wait for solve to leave 'solving' and focus it then instead.
   const awaitingTriggerFocus = useRef(false)
+  // Dual-mount regression (advisor review): this effect has no initial-mount guard below, so it ALSO
+  // fires once on every mount (React runs every effect after the first render, not just on later
+  // dependency changes), not just on later `confirming` transitions. outageLine is shared AppState, so
+  // mounting a SECOND instance (chapter's lab placement) while a line is already selected renders that
+  // instance's own trigger button immediately -- without the guard, the mount-time run of this effect
+  // would yank keyboard focus to it regardless of what the user was actually doing elsewhere on the
+  // page. `justMounted` skips exactly that first run per instance; every later run is a real
+  // `confirming` transition this effect is meant to react to.
+  const justMounted = useRef(true)
   useEffect(() => {
+    if (justMounted.current) { justMounted.current = false; return }
     if (confirming) { confirmRef.current?.focus(); return }
     if (triggerRef.current && !triggerRef.current.disabled) triggerRef.current.focus()
     else awaitingTriggerFocus.current = true
