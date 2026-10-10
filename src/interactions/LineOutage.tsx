@@ -53,7 +53,7 @@ export function LineOutage({ placement = 'home' }: { placement?: 'home' | 'lab' 
   const islands = result?.result.islands.length ?? 0
   return (
     <section data-placement={placement} aria-labelledby={headingId} onKeyDown={e => { if (e.key === 'Escape') setConfirming(false) }}>
-      <h2 id={headingId}>Line outage</h2>
+      <h2 id={headingId}>Line outage{placement === 'lab' && <span className="sr-only"> (laboratory)</span>}</h2>
       <label>Line to disable{' '}
         <select value={line ?? ''} disabled={solve === 'solving'} onChange={e => { setConfirming(false); dispatch({ type: 'setOutageLine', line: e.target.value === '' ? null : +e.target.value }) }}>
           <option value="">Select a line</option>

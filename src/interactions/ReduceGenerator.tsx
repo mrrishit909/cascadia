@@ -20,7 +20,7 @@ export function ReduceGenerator({ placement = 'home' }: { placement?: 'home' | '
   const selectGen = (next: number | null) => dispatch({ type: 'setGenDraft', gen: next, mw: next === null ? 0 : eff[next] ?? network.gens[next].pmax_mw })
   return (
     <section data-placement={placement} aria-labelledby={headingId}>
-      <h2 id={headingId}>Reduce generator</h2>
+      <h2 id={headingId}>Reduce generator{placement === 'lab' && <span className="sr-only"> (laboratory)</span>}</h2>
       <label>Generator{' '}
         <select value={gen ?? ''} onChange={e => selectGen(e.target.value === '' ? null : +e.target.value)}>
           <option value="">Select a generator</option>

@@ -21,7 +21,7 @@ export function IncreaseLoad({ placement = 'home' }: { placement?: 'home' | 'lab
   const selectBus = (next: number | null) => dispatch({ type: 'setLoadDraft', bus: next, f: next === null ? 1 : eff[next] ?? 1 })
   return (
     <section data-placement={placement} aria-labelledby={headingId}>
-      <h2 id={headingId}>Increase load</h2>
+      <h2 id={headingId}>Increase load{placement === 'lab' && <span className="sr-only"> (laboratory)</span>}</h2>
       <label>Load bus{' '}
         <select value={bus ?? ''} onChange={e => selectBus(e.target.value === '' ? null : +e.target.value)}>
           <option value="">Select a bus</option>

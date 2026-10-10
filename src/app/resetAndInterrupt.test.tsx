@@ -1,5 +1,5 @@
 // Acceptance: "Exact reset" (deep-equal full AppState) and "Interruption safety" (latest request wins).
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import highsLoader from 'highs'
 import { afterEach, expect, it, vi } from 'vitest'
 import { solveDcopf } from '../engine/dcopf'
@@ -19,6 +19,10 @@ const stubFetch = () => vi.stubGlobal('fetch', async (url: string) => ({
 // user-visible "scenario state" that an exact reset promises to restore, so exclude it from equality checks.
 const sansEpoch = (s: AppState) => { const { epoch: _epoch, ...rest } = s; return rest }
 
+// Scene now also mounts a 'lab' placement of every control (LabStub, App.tsx) as the dual-placement
+// gate proof -- see App.test.tsx's matching comment for why this scoping is needed.
+const home = () => within(screen.getByTestId('home-controls'))
+
 async function setup(solver: Parameters<typeof AppProvider>[0]['solver']) {
   stubFetch()
   const h: { state: AppState; api: ReturnType<typeof useApp> } = {} as never
@@ -34,7 +38,7 @@ it('CAS-INT-001: reset after bus removal deep-equals the post-load state', async
   const before = structuredClone(h.state)
   const bus = screen.getAllByTestId('bus')[26]
   bus.focus(); fireEvent.keyDown(bus, { key: 'Enter' })
-  fireEvent.click(screen.getByText('Confirm removal'))
+  fireEvent.click(home().getByText('Confirm removal'))
   await waitFor(() => expect(h.state.removedBus).toBe(26))
   expect(h.state).not.toEqual(before)
   fireEvent.click(screen.getByText('Reset to baseline'))
@@ -48,7 +52,7 @@ it('CAS-INT-005: reset after capacity change deep-equals the post-load state', a
   const before = structuredClone(h.state)
   const line = screen.getAllByTestId('line')[9]
   line.focus(); fireEvent.keyDown(line, { key: 'Enter' })
-  fireEvent.change(screen.getByRole('slider'), { target: { value: '0.5' } })
+  fireEvent.change(home().getByRole('slider'), { target: { value: '0.5' } })
   await waitFor(() => expect(h.state.lineCapacity).toEqual({ 9: 0.5 }), { timeout: 3000 })
   expect(h.state).not.toEqual(before)
   fireEvent.click(screen.getByText('Reset to baseline'))

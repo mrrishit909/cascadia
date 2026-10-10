@@ -34,7 +34,7 @@ export function CompareRestoration({ placement = 'home' }: { placement?: 'home' 
 
   return (
     <section data-placement={placement} aria-labelledby={headingId}>
-      <h2 id={headingId}>Compare restoration</h2>
+      <h2 id={headingId}>Compare restoration{placement === 'lab' && <span className="sr-only"> (laboratory)</span>}</h2>
       <p>Hypothetical fault scenarios (synthetic, chosen for this control; not tied to the app&apos;s current scenario above). Ranks every restoration order by served_mw_steps (sum of served MW over the intermediate restoration states, one equal time step per action -- MW&middot;steps, not MWh).</p>
       <label>Fault scenario{' '}
         <select value={presetId} disabled={status === 'loading'} onChange={(e) => selectRestorationPreset(e.target.value)}>

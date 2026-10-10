@@ -19,7 +19,7 @@ export function RemoveNode({ placement = 'home' }: { placement?: 'home' | 'lab' 
   const solving = solve === 'solving'
   return (
     <section data-placement={placement} aria-labelledby={headingId} onKeyDown={e => { if (e.key === 'Escape') dispatch({ type: 'select', bus: null }) }}>
-      <h2 id={headingId}>Remove substation</h2>
+      <h2 id={headingId}>Remove substation{placement === 'lab' && <span className="sr-only"> (laboratory)</span>}</h2>
       <label>Bus{' '}
         <select value={selectedBus ?? ''} disabled={solving}
           onChange={e => dispatch({ type: 'select', bus: e.target.value === '' ? null : +e.target.value })}>

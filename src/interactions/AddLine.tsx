@@ -13,7 +13,7 @@ export function AddLine({ placement = 'home' }: { placement?: 'home' | 'lab' } =
   if (!network) return null
   return (
     <section data-placement={placement} aria-labelledby={headingId}>
-      <h2 id={headingId}>Add transmission line</h2>
+      <h2 id={headingId}>Add transmission line{placement === 'lab' && <span className="sr-only"> (laboratory)</span>}</h2>
       <p>{candidates.length} SYNTHETIC candidate lines (not part of the real IEEE case30 topology; see <code>public/data/raw-metadata/candidate_lines.json</code>).</p>
       <ul>
         {candidates.map((cl, k) => {

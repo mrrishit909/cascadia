@@ -80,7 +80,7 @@ export function AlterCapacity({ placement = 'home' }: { placement?: 'home' | 'la
   }
   return (
     <section data-placement={placement} aria-labelledby={headingId}>
-      <h2 id={headingId}>Alter line capacity</h2>
+      <h2 id={headingId}>Alter line capacity{placement === 'lab' && <span className="sr-only"> (laboratory)</span>}</h2>
       <label>Line{' '}
         <select value={selectedLine ?? ''} onChange={e => dispatch({ type: 'selectLine', line: e.target.value === '' ? null : +e.target.value })}>
           <option value="">Select a line</option>
