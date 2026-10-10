@@ -41,6 +41,15 @@ one is also noted inline, in the source file closest to the decision, at the tim
   would show plausible-looking but WRONG per-bus detail for a state that was never actually solved at
   that granularity), each mini network is given a minimal, honest empty result object. The real
   aggregate number is shown accurately, separately, in the step chart.
+- **Chapter 6's inspector rail has zero page-scroll sticky range at desktop**, not a "pins while you
+  scroll past the chapter" behavior. `ART_DIRECTION.md` row 6 describes "a fixed 384px inspector rail
+  on the right"; the rail IS `position:sticky` and correctly right-anchored, opaque, and reachable, but
+  since it's the chapter section's only child and is already `height:100vh`, the section's own content
+  box (sticky ranges exclude padding) exactly equals the rail's own height, leaving no slack to pin
+  through. In practice it sits at its normal flow position and scrolls with the page like any other
+  element. All 7 controls remain reachable regardless, via the rail's own independent
+  `overflow-y:auto` internal scroll (confirmed directly, including the 7th, CompareRestoration) -- this
+  is a positioning-semantics gap, not a reachability one.
 
 ## Responsive design
 

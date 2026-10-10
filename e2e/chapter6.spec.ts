@@ -170,11 +170,9 @@ test.describe("layout: inspector rail is opaque, flush right, anchored, and clea
       await page.waitForFunction(() => document.querySelector(".stage-sticky")?.getAttribute("data-active-chapter") === "ch6");
       await page.waitForTimeout(300);
       const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
-      // A small (~10px) overflow from the FIG-index nav strip's own last link pre-exists site-wide
-      // (confirmed present on chapter 1 too, unrelated to this fix) -- this check is for the rail's
-      // OWN overflow (previously ~96-130px from the stale desktop-only margin/align-self), not that
-      // pre-existing, unrelated nav artifact.
-      expect(scrollWidth).toBeLessThanOrEqual(viewport.width + 15);
+      // The nav strip's own overflow (once a separate, now-fixed defect, see introMotion.spec.ts's
+      // "SKIP INTRO never overlaps" tests) is fixed too, so this is an exact bound, not a tolerance.
+      expect(scrollWidth).toBeLessThanOrEqual(viewport.width);
       const docHeight = await page.evaluate(() => document.body.scrollHeight);
       const startY = await page.evaluate(() => window.scrollY);
       let sawStageAwayFromRail = false;

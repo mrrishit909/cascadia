@@ -1110,10 +1110,11 @@ caused genuine horizontal overflow (864px content in a 768px tablet viewport, 51
 clipping real control text/buttons) and a PERSISTENT overlay over the network for most of the rail's
 scroll length at tablet/mobile, where the spec requires clean stacking with zero overlap. Fixed by
 explicitly zeroing both missed properties; a scroll-sweep regression test added (confirmed red against
-the pre-fix CSS first, matching the reviewer's own overflow numbers almost exactly). The ~10px overflow
-measured at mobile turned out to be a pre-existing, unrelated FIG-index nav artifact also present on
-chapter 1 -- confirmed, not fixed (outside this task's scope), and the new test's tolerance accounts
-for it explicitly rather than silently passing through a looser bound.
+the pre-fix CSS first, matching the reviewer's own overflow numbers almost exactly). A separate ~10px
+overflow measured at mobile at the time was traced to the FIG-index nav strip (also present on chapter
+1, unrelated to this specific fix) -- NOT left as an accepted gap: fixed in the 4th remediation pass
+below (`overflow-x:auto` + `white-space:nowrap` on `.fig-index`), and the tolerance this comment
+originally referred to has since been removed; the nav-overflow checks are exact bounds now.
 
 **Full suite re-run fresh after all THREE remediation passes**: `npx tsc --noEmit` clean, Vitest
 61/61, pytest 32/32, Playwright 118/118. All three remediation commits are on `main`.
@@ -1155,6 +1156,8 @@ parity check, a consolidated responsive-screenshot set, concurrency/reset regres
 each been exercised individually across the remediation passes above but not yet re-run as one single
 consolidated final pass) and phase 5 (the final acceptance report,
 `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`, plus `CASCADIA_FINAL_HANDOFF.md`). The known,
-accepted, honestly-documented gaps going into that report: mobile LCP's 67ms miss against the gate
-(LIMITATIONS.md), the ~15px pre-existing nav-strip overflow artifact (LIMITATIONS.md/tests), and no
-deployment (never authorized).
+accepted, honestly-documented gaps going into that report: mobile LCP's measured miss against the gate
+(LIMITATIONS.md -- re-measurement with a 3-run median still pending as of this update), chapter 6's
+rail having zero page-scroll sticky range (LIMITATIONS.md, positioning semantics only, not
+reachability), and no deployment (never authorized). The nav-strip overflow is FIXED, not an accepted
+gap (see above).

@@ -155,12 +155,16 @@
    dualMount, newControls). `position: sticky` + `align-self: flex-end` (ch6's own `.chapter-section`
    is the `display:flex;flex-direction:column` parent) stays correctly bounded to ch6's own section as
    its sticky containing block, like every other chapter's existing stage-slot CSS -- computed style
-   confirms `position:sticky` is applied (not overridden), but note the section's own vertical padding
-   leaves only a modest page-scroll range before the rail scrolls away with the rest of the page (NOT
-   "pinned for the chapter's entire scroll length" -- don't describe it that way in docs or reports).
-   The 7 cards' own internal reachability does NOT depend on that page-level pin: the rail's own
-   `height:100vh; overflow-y:auto` gives it a fixed-height internal scrollbar, confirmed all 7 controls
-   (including the 7th, CompareRestoration) are reachable via that internal scroll regardless. */
+   confirms `position:sticky` is applied (not overridden). HOWEVER, measured directly (not assumed):
+   this sticky range is ZERO, not "modest" -- the rail is the section's only child and is already
+   `height:100vh`, so the section's own content box (excluding padding, which sticky ranges don't
+   count) is exactly the rail's own height with no slack for it to pin through. In practice the rail
+   therefore just sits at its normal flow position (the section's own padding-top) and scrolls with
+   the page like any other element -- it does NOT "pin while you scroll past the chapter" the way
+   ART_DIRECTION.md row 6's "fixed 384px rail" phrasing could be read to imply. See LIMITATIONS.md.
+   The 7 cards' own internal reachability does NOT depend on page-level pinning either way: the rail's
+   own `height:100vh; overflow-y:auto` gives it a fixed-height internal scrollbar, confirmed all 7
+   controls (including the 7th, CompareRestoration) are reachable via that internal scroll regardless. */
 #ch6 .chapter-controls-column {
   position: sticky;
   top: 0;
@@ -403,7 +407,7 @@
      the whole document. */
   .fig-index { left: 0; top: 0; transform: none; flex-direction: row; flex-wrap: nowrap; width: 100%; max-width: 100vw; overflow-x: auto; padding: var(--sp-3) var(--sp-4); background: var(--surface); position: sticky; }
   /* `.skip-intro` stays `position:fixed; top:24px; right:24px` (its desktop rule, above) at every
-     width -- at <1023px the FIG index becomes a full-width top bar (~44px tall, matching the
+     width -- at <1023px the FIG index becomes a full-width top bar (56px tall, matching the
      `.stage-sticky` offset just below) occupying that exact same top-right corner, so the two
      literally overlapped (found via a real screenshot at 390x844: "SKIP INTRO" drawn directly over
      "FIG. 04"/"FIG. 05"). Dropped below the bar instead of floating over it. */
@@ -416,7 +420,11 @@
      unscrolled top offset across this breakpoint's narrower sub-ranges is 32px (sp-6) -- 32+56=88px,
      so 100px clears it with margin at every width in this range. */
   .skip-intro { top: 100px; right: var(--sp-4); }
-  .stage-sticky { top: 44px; height: calc(100vh - 44px); }
+  /* Was `top: 44px` (a pre-existing guess, predating this session) -- the real measured `.fig-index`
+     bar height is 56px (confirmed above, after the `white-space:nowrap` fix made it a reliable single
+     line), so the stage was starting 12px too high, with that much of the network's own top edge
+     hidden under the opaque nav bar. */
+  .stage-sticky { top: 56px; height: calc(100vh - 56px); }
   .stage-sticky[data-active-chapter="ch2"] .stage-inner,
   .stage-sticky[data-active-chapter="ch4"] .stage-inner { width: 100%; margin: 0; height: 55vh; align-self: flex-start; }
   .chapter-section { padding: var(--sp-8) var(--sp-4); }
