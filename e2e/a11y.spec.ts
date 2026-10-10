@@ -4,7 +4,7 @@
 // which only runs a subset of axe's own ruleset.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { home } from "./helpers/placement";
+import { controlHome, controlLab, home } from "./helpers/placement";
 
 test("axe-core: baseline page has zero violations", async ({ page }) => {
   await page.goto("/");
@@ -23,10 +23,29 @@ test("axe-core: baseline page has zero violations", async ({ page }) => {
 // present so a screen reader can detect the text MUTATION rather than missing a freshly-inserted node
 // (a real defect found and fixed in a second advisor-review pass: the first version of this fix
 // conditionally mounted/unmounted the live region, which screen readers frequently never announce).
-test("exactly 4 live regions are always mounted; restoration's status text updates once Compare runs", async ({ page }) => {
+//
+// Independent review (P1): this test's own `[role="status"], [role="alert"]` CSS-attribute selector
+// only matches EXPLICIT role attributes, so it stayed "4" even after AlterCapacity/IncreaseLoad/
+// ReduceGenerator's <output> elements (cap-factor/load-factor/gen-pmax) started duplicating live
+// announcements a THIRD way: <output> carries an IMPLICIT role="status" (aria-live="polite") per the
+// HTML-AAM spec. Confirmed via Chromium's accessibility tree (not visible to this CSS selector, or to
+// axe's ruleset): selecting a value in all three sliders showed 10 live roots, not 4. Fixed in the app
+// (aria-live="off" on each <output>, keeping its semantic role without the automatic announcement) and
+// here: the query now matches `output` too, and excludes anything explicitly marked `aria-live="off"`,
+// so a regression that reintroduces a live <output> (or removes the override) is actually caught.
+test("exactly 4 live regions are always mounted (including output elements' implicit role); restoration's status text updates once Compare runs", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".provenance");
-  const liveRegions = page.locator('[role="status"], [role="alert"]');
+  const liveRegions = page.locator('[role="status"]:not([aria-live="off"]), [role="alert"]:not([aria-live="off"]), output:not([aria-live="off"])');
+  await expect(liveRegions).toHaveCount(4);
+  // populate every <output> in both placements (home + lab) to prove they don't count even when rendered
+  await controlHome(page, "Alter line capacity").locator('select').selectOption({ index: 1 });
+  await controlHome(page, "Increase load").locator('select').selectOption({ index: 1 });
+  await controlHome(page, "Reduce generator").locator('select').selectOption({ index: 1 });
+  await controlLab(page, "Alter line capacity").locator('select').selectOption({ index: 1 });
+  await controlLab(page, "Increase load").locator('select').selectOption({ index: 1 });
+  await controlLab(page, "Reduce generator").locator('select').selectOption({ index: 1 });
+  await expect(page.locator('output')).toHaveCount(6);
   await expect(liveRegions).toHaveCount(4);
   const restorationStatus = page.getByTestId("restoration-status-region-status");
   await expect(restorationStatus).toHaveText("");

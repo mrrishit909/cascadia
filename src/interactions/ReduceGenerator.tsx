@@ -33,7 +33,9 @@ export function ReduceGenerator({ placement = 'home' }: { placement?: 'home' | '
             <input type="range" min={0} max={rated} step={1} value={mw} onChange={e => dispatch({ type: 'setGenDraft', gen, mw: +e.target.value })}
               aria-valuetext={`${mw} of ${rated} MW`} />
           </label>
-          <output data-testid="gen-pmax">{mw} MW</output>{' '}
+          {/* Independent review (P1): <output> has an implicit role="status" (aria-live="polite") --
+              see AlterCapacity.tsx's matching comment for the full repro/reasoning. */}
+          <output data-testid="gen-pmax" aria-live="off">{mw} MW</output>{' '}
           <button disabled={solve === 'solving'} onClick={() => setGenPmax(gen, mw === rated ? null : mw)}>Apply limit</button>
         </div>
       )}

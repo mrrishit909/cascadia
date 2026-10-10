@@ -94,7 +94,15 @@ export function AlterCapacity({ placement = 'home' }: { placement?: 'home' | 'la
               aria-valuetext={`${factor.toFixed(2)}x, ${(line.rating_mw * factor).toFixed(1)} MW`}
               onChange={e => { dispatch({ type: 'setCapDraft', factor: +e.target.value, allowShed }); fire(+e.target.value, allowShed) }} />
           </label>
-          <output data-testid="cap-factor">{factor.toFixed(2)}x</output>{' '}
+          {/* Independent review (P1): <output> has an IMPLICIT role="status" (aria-live="polite") per the
+              HTML-AAM spec -- undocumented here before the review caught it via Chromium's accessibility
+              tree (axe/the CSS-selector-based live-region count in e2e/a11y.spec.ts can't see implicit
+              roles, so this went unnoticed through both live-region passes). Without aria-live="off",
+              every arrow-key/drag step announces this value a SECOND time on top of the slider's own
+              aria-valuetext, and doubles again once a second control placement mounts. <output>'s
+              semantic association with its slider is still worth keeping (that's genuinely what it is);
+              aria-live="off" keeps the role without the automatic announcement. */}
+          <output data-testid="cap-factor" aria-live="off">{factor.toFixed(2)}x</output>{' '}
           <span data-testid="cap-rating">{(line.rating_mw * factor).toFixed(1)} MW rating</span>
           <label><input type="checkbox" checked={allowShed} onChange={e => { dispatch({ type: 'setCapDraft', factor, allowShed: e.target.checked }); fire(factor, e.target.checked) }} /> Allow load shedding</label>
         </div>

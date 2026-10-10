@@ -28,3 +28,5 @@ export const lab = (page: Page): Locator => page.locator('[data-placement="lab"]
 // `controlHome(page, label)` is the correct replacement: filter the 7 home sections down to the one
 // whose text content matches `label`, then query inside that single result.
 export const controlHome = (page: Page, label: string): Locator => home(page).filter({ hasText: label });
+// Same fix, for the 'lab' placement (LabStub, App.tsx).
+export const controlLab = (page: Page, label: string): Locator => lab(page).filter({ hasText: label });

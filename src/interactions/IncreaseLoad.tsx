@@ -34,7 +34,9 @@ export function IncreaseLoad({ placement = 'home' }: { placement?: 'home' | 'lab
             <input type="range" min={1} max={10} step={0.25} value={f} onChange={e => dispatch({ type: 'setLoadDraft', bus, f: +e.target.value })}
               aria-valuetext={`${f.toFixed(2)}x, ${(base * f).toFixed(1)} MW`} />
           </label>
-          <output data-testid="load-factor">{f.toFixed(2)}x</output>{' '}
+          {/* Independent review (P1): <output> has an implicit role="status" (aria-live="polite") --
+              see AlterCapacity.tsx's matching comment for the full repro/reasoning. */}
+          <output data-testid="load-factor" aria-live="off">{f.toFixed(2)}x</output>{' '}
           <span data-testid="load-mw">{(base * f).toFixed(1)} MW demand</span>{' '}
           <button disabled={solve === 'solving'} onClick={() => setLoadScale(bus, f)}>Apply load</button>
         </div>

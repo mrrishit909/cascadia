@@ -4,6 +4,7 @@
 // project's own rule that async interactions must be tested against the real runtime.
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import highsLoader from 'highs'
+import { StrictMode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { solveDcopf } from '../engine/dcopf'
 import { AppProvider } from './state'
@@ -130,6 +131,63 @@ describe('dual mount: LineOutage (selection lifted to AppState.outageLine)', () 
     )
     // instance B mounts fresh with outageLine already '0' (shared), so its own trigger button renders
     // immediately -- focus must stay wherever the user actually put it, not jump to instance B
+    expect(document.activeElement).toBe(triggerA)
+  })
+
+  it('REGRESSION (independent review, P1): a confirm dialog opened in one instance is not silently re-targeted by another instance changing the shared line', async () => {
+    // Repro the review reported: mount home+lab, select line 0 in home and open its confirm dialog
+    // (local `confirming` was a bare boolean with no memory of WHICH line it was opened for), then
+    // select a DIFFERENT line in the lab instance (shared outageLine). Home's dialog stayed open but
+    // re-rendered for the NEW shared line -- confirming it would take the wrong line out of service.
+    // Fixed by tracking `confirmingLine` (the specific line this instance's dialog was opened for) and
+    // deriving `confirming` as "dialog open AND still for the current shared line"; the dialog now
+    // auto-closes the instant the shared selection diverges from what this instance actually confirmed.
+    await setup(<><div data-testid="home"><LineOutage /></div><div data-testid="lab"><LineOutage /></div></>, "Line outage")
+    const home = within(screen.getByTestId('home'))
+    const lab = within(screen.getByTestId('lab'))
+    fireEvent.change(home.getByLabelText('Line to disable'), { target: { value: '0' } })
+    fireEvent.click(home.getByText('Disable line'))
+    expect(home.getByText(/Take line 0 out of service/)).toBeTruthy()
+    fireEvent.change(lab.getByLabelText('Line to disable'), { target: { value: '5' } })
+    await waitFor(() => expect((home.getByLabelText('Line to disable') as HTMLSelectElement).value).toBe('5'))
+    // the confirm dialog must have closed, not silently re-rendered for line 5
+    expect(home.queryByText(/Take line \d+ out of service/)).toBeNull()
+    expect(home.queryByText('Confirm outage')).toBeNull()
+  })
+})
+
+describe('dual mount: LineOutage focus-steal guard under StrictMode', () => {
+  it('REGRESSION (independent review, P2): mounting a second instance under StrictMode does not steal focus, even with the double mount/cleanup/mount React runs there', async () => {
+    // The original fix used a one-shot `justMounted` ref flag: correct against a single mount, but
+    // under <StrictMode> (main.tsx wraps the real app in it) React deliberately runs mount -> cleanup ->
+    // mount again for every freshly mounted component tree, specifically to surface impure effects. The
+    // flag is already flipped false by the FIRST simulated mount, so it no longer skips the SECOND one --
+    // the focus-steal reappears in dev mode. Fixed by comparing against the PREVIOUS `confirming` value
+    // in a ref instead of a single-use flag, which both of StrictMode's simulated mounts observe as
+    // unchanged.
+    stubFetch()
+    const highs = await highsLoader()
+    const { rerender } = render(
+      <StrictMode>
+        <AppProvider solver={async (c, sc, cands) => solveDcopf(c, highs, sc, cands)}>
+          <div data-testid="home"><LineOutage /></div>
+        </AppProvider>
+      </StrictMode>,
+    )
+    await screen.findAllByText('Line outage')
+    const home = within(screen.getByTestId('home'))
+    fireEvent.change(home.getByLabelText('Line to disable'), { target: { value: '0' } })
+    const triggerA = home.getByText('Disable line')
+    triggerA.focus()
+    expect(document.activeElement).toBe(triggerA)
+    rerender(
+      <StrictMode>
+        <AppProvider solver={async (c, sc, cands) => solveDcopf(c, highs, sc, cands)}>
+          <div data-testid="home"><LineOutage /></div>
+          <div data-testid="lab"><LineOutage /></div>
+        </AppProvider>
+      </StrictMode>,
+    )
     expect(document.activeElement).toBe(triggerA)
   })
 })
