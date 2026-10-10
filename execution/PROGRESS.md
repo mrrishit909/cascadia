@@ -717,27 +717,134 @@ the layout-collision bug) was invisible to a quick glance and only surfaced by c
 computed state or a genuinely independent review, never assumed from reading the code or trusting one
 green test run.
 
-Continue with chapter 4 ("outage cascades": editorial split, canvas-led, mirrored from chapter 2 --
-network LEFT ~65%, a fault ledger right listing removed element/island count/isolated MW/shed MW/
-objective change, the single-LP disclaimer directly under the numbers). Load-bearing per
-ART_DIRECTION.md section 3's own "single-shot rule": ONE 700ms tween for the ENTIRE baseline-to-post-
-fault transition (kerf opens, islands translate 24px apart, affected lines go de-energized, ledger
-numbers swap at the END, never mid-tween) -- no stagger by graph distance, no sequential/cascading
-visual trips, because either would visually claim a cascading-trip model this engine does not
-implement (the disclaimer text "Single LP solve after the fault. Cascading trips are not modeled."
-must appear in the ledger, matching `LIMITATIONS.md`). `Chapter4Ledger.tsx` already exists with the
-real numbers (built during the earlier chapter-shell phase) -- read it before assuming it needs to be
-rebuilt; this pass is about the MOTION (the single tween + island-separation), not the analytical
-content, which is already correct. Trigger is "single trigger, not scrub" per the motion table (ch4 is
-NOT scroll-scrubbed like 2/3), so this is a one-shot `useScene` timeline like `IntroSequence`/
-`ChapterTitle`, not a new `ScrollTrigger.create` scrub pattern. Then chapters 5-6, each verified
-(vitest + e2e covering entry/midpoint/exit/forward/reverse/instant-jump/interrupted/reduced-motion/
-analytical-preservation + a live-control-during-motion scenario like chapter 3's own + real screenshots
-at all 3 breakpoints, actually read) and committed before moving to the next. After chapter 6: the
-full-suite frame-pacing pass across all 6 chapters' heaviest interactions together (chapter 3's own
-measurement above is isolated, not a substitute), then an independent adversarial review in an isolated
-worktree per the directive's phase 6, then final release readiness per phase 8. Do not claim
-performance compliance or final acceptance without that evidence.
+## Chapter 4 ("Outage cascades") landed, including this project's most serious bug yet
+
+Editorial split, canvas-led, mirrored from chapter 2 (network LEFT ~65%, fault ledger right).
+`Chapter4Ledger.tsx` already had the real analytical content from the earlier chapter-shell phase, so
+this pass built only the MOTION: `Chapter4Scene.tsx`, a one-shot `useScene` timeline (NOT a scroll
+scrub -- ch4's own motion-table row is "single trigger," the same one-shot pattern as `IntroSequence`/
+`ChapterTitle`) implementing ART_DIRECTION.md section 3's load-bearing single-shot rule: ONE 700ms
+whole-stage crossfade wraps the instant baseline-to-post-fault swap (the same proven technique
+`IntroSequence`'s own beat 4 established -- a React prop swap can't be intercepted mid-render to
+animate a literal "before" state), the ledger's numbers are held at opacity 0 until the exact tween
+completion (never mid-tween, confirmed by polling), and isolated-island buses
+(`data-state="shed_no_generation"`, the real analytical marker, not a guess) nudge 24px outward from
+the network's own centroid, ending there (not bouncing back) for as long as the fault condition holds.
+Re-fires on every CHANGE the ledger shows (a `resultKey` derived from the displayed removed-
+element/disabled-lines set), not just entry, so a later RemoveNode/LineOutage confirmation while
+already on chapter 4 gets the identical single-tween treatment.
+
+**This project's most serious bug found so far, caught by an UNRELATED test, not this chapter's own
+(a real lesson in itself):** the first version cleared a bus's previous island-separation offset with
+`gsap.set(bus, {x:0, y:0})`, intending "no additional offset from wherever it already is." GSAP's x/y
+properties are ABSOLUTE, not relative -- this instead overwrote EVERY bus's real
+`transform="translate(x y)"` position with an identity transform, collapsing the entire 30-bus network
+to the SVG's origin corner, on every single mount (including the very first page load, since
+`Chapter4Scene` is always-mounted like every other scene and this ran unconditionally before even
+checking `active==='ch4'`). `clearProps` was tried next and was ALSO insufficient: GSAP's SVG support
+can write directly to the `transform` ATTRIBUTE rather than a CSS style for an element like this, and
+`clearProps` only reverses an inline style -- it does nothing for an attribute-level write, and React's
+reconciliation (comparing its own virtual-DOM output, unchanged since bus layout is static) does not
+re-apply the attribute on a later render either, once GSAP has overwritten it outside React's
+knowledge. This was caught when `e2e/touch.spec.ts` -- a completely unrelated, pre-existing test that
+never scrolls past the intro -- started timing out trying to find buses at their expected screen
+position; it was NOT caught by this chapter's own first-draft tests, which only checked "not stuck at
+the OLD offset" and missed that the "fixed" value was also wrong, just wrong in a different way.
+**Lesson applied going forward: after any chapter's changes, re-run the FULL suite (not just that
+chapter's new tests) before trusting green, and treat an unrelated test's sudden failure as a real
+regression to chase down immediately, never a flake to retry past.** Fixed properly: a `useRef` map
+captures each bus's TRUE natural position ONCE, the first time (and only time) this scene ever touches
+it, and every later run reads from that captured value, never re-derives "natural" from the
+(possibly-already-corrupted) live DOM.
+
+Verified: entry (ledger hidden mid-tween, reveals exactly at completion), the control-change-mid-ch4
+regression (re-plays the tween, updates to the new live result), the collapse-to-origin regression
+specifically (every bus confirmed inside the stage's real rendered bounds after a scenario change, not
+just "has some transform"), reverse (leaving mid-tween and returning replays cleanly), an interrupted
+transition (fast scroll straight through leaves nothing stuck dimmed), reduced motion (instant, fully
+settled), and analytical-state preservation (no solver Worker from scrolling alone) --
+`e2e/chapter4.spec.ts`, 8 tests. A dedicated axe-core pass over chapter 4 found zero violations
+(`e2e/a11y.spec.ts`). A real layout collision (chapter 4's own title/ledger/controls sitting in normal
+document flow at the SAME left edge the network's own CSS slot already occupies -- the mirror-image of
+chapter 2's problem, which doesn't hit it because chapter 2 pushes the network right instead) found via
+screenshot and fixed with `align-items: flex-end` on the section. Real screenshots at all 3 breakpoints
+plus reduced motion, re-captured AFTER the collapse-to-origin fix and actually read --
+`verification/SCREENSHOTS/ch4-desktop-1440x900-settled.png`, `ch4-desktop-1440x900-mid-tween.png`,
+`ch4-tablet-768x1024.png`, `ch4-mobile-390x844.png`, `ch4-reduced-motion.png`: the settled screenshot
+visibly shows buses 29/30 pulled outward from their isolated island, confirming the separation effect
+actually reads as intended, not just passing assertions.
+
+Test counts: 61/61 vitest, 96/96 e2e (+8 chapter4, +1 a11y), 32/32 pytest, clean build.
+
+## Resume point if this session ends mid-chapter-work
+
+Check `git log --oneline -10` for the most recent commit, and re-read this file plus
+`docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` and `docs/ART_DIRECTION.md` section 4 (storyboard/motion
+table) by then. The shared GSAP lifecycle layer, the FULL intro sequence, `ChapterTitle`, and chapters
+1-4 are built, reviewed, verified, and committed. Patterns every subsequent scene should follow, now
+including chapter 4's own hard lesson:
+- `useScene`, not raw `useGSAP`/`ScrollTrigger`. Every scene's `setup()` kills its own prior work
+  FIRST (`gsap.killTweensOf()` for plain tweens, `tlRef.current?.kill()` for a one-shot timeline).
+- **Never use GSAP's `x`/`y` (or any shorthand transform property) to "reset" an SVG element that
+  already has a non-GSAP-owned `transform` attribute, and never assume `clearProps` reverses an
+  attribute-level write** -- GSAP's x/y are ABSOLUTE positions, and its SVG support can write straight
+  to the attribute rather than a CSS style. Capture the element's TRUE natural position in a `useRef`
+  the FIRST time (and only time) a scene ever touches it, and always animate/reset relative to that
+  captured value, never a fresh DOM read on a later run (which may already be corrupted, and React will
+  not necessarily re-apply an unchanged prop value to fix it).
+- **After any chapter's changes, re-run the FULL test suite, not just that chapter's own new tests,
+  before trusting green** -- chapter 4's worst bug was caught by an unrelated, pre-existing touch test,
+  not by chapter 4's own first-draft coverage.
+- A scroll-scrubbed chapter (2 and 3's shared pattern) needs real scroll runway (`min-height: 200vh`)
+  and a trigger `end` with a REAL, EMPIRICALLY-SWEPT margin before `useActiveChapter`'s own handoff
+  point -- sweep scroll fraction vs. `data-active-chapter` directly, never assume a round number is
+  safe. One `apply(progress)` function, called from both `onUpdate` and once immediately after
+  `ScrollTrigger.create()`. A `FigIndex.tsx` `SCRUB_END_FRACTION` entry kept in sync with the trigger's
+  own `end`. A one-shot (non-scrubbed) chapter re-fires its whole tween on a `resultKey` dependency
+  change, not just on `active` entry, if its ledger/readout can change while already active (chapter 4's
+  own pattern).
+- Camera writes go through `claimCamera`; `Scene`'s own reset in `App.tsx` is in the render body, not a
+  `useEffect` (React's layout-effects-before-passive-effects ordering is tree-wide, not parent-before-
+  child).
+- When a chapter's own content might visually collide with the persistent stage's current slot, MEASURE
+  the slot's real rendered footprint and clear it with padding/alignment -- don't guess.
+- A chapter whose own scene does real DOM measurement (`getScreenCTM`, `getBoundingClientRect`) needs a
+  feature-detect guard so vitest/jsdom doesn't crash -- real-browser e2e is that scene's actual
+  coverage.
+- A performance measurement MUST include an idle-baseline control before concluding a kill-criterion
+  "failure" reflects real app cost.
+
+**Before trusting ANY chapter's visual, camera, or geometry state**, take and READ a real
+(non-`fullPage`) screenshot at the chapter's actual scroll position, cross-check the specific thing
+that matters via direct `evaluate`/`getAttribute`/SVG-property reads, AND re-run the full test suite --
+every real bug found across chapters 1-4 (the background bug, the effect-ordering bug, two unreachable-
+end-state bugs, the stale-tween bug, two layout-collision bugs, and the collapse-to-origin bug, the
+worst of them) was invisible to a quick glance and only surfaced by checking actual DOM/computed state,
+a genuinely independent review, or the full suite -- never assumed from reading the code or trusting
+one chapter's own green tests in isolation.
+
+Continue with chapter 5 ("recovery plans": comparative view -- three equal columns, one per
+restoration sequence from CAS-INT-006's own fixture, each a mini network plus a served-MW step chart on
+a SHARED y-axis, ranked by served energy, a step control advancing all three in sync). Per
+CHAPTER_ARCHITECTURE.md section 2's own resolution, chapter 5 is the ONLY chapter where the main
+persistent stage is inert (`.stage-sticky[data-active-chapter="ch5"] { opacity: 0; pointer-events: none
+}`, already in `experience.css`) -- the three mini networks are a SEPARATE, non-interactive render
+variant of the same `NetworkView` encoding (it already has an `interactive: boolean` prop and
+`mini-bus`/`mini-line` testids for exactly this, per earlier chapter-shell work -- read `NetworkView.tsx`
+before assuming new rendering code is needed). `CompareRestoration.tsx` already computes the real
+ranked orders; this pass is about: (1) rendering 3 real mini `NetworkView`s side by side from that
+data, (2) the step index-driven motion table row (trigger: "User presses STEP / selects a sequence, not
+scroll"; "All three columns share one step index and one timeline"; reduced motion: "Instant step"), and
+(3) the shared-y-axis step chart ART_DIRECTION.md describes. Then chapter 6 (laboratory: "Any control
+commit, then Worker result" drives "last result dims to 60% while solving, then all changed elements
+transition together on result" -- feedback timing hooks into the EXISTING `state.solve` status machine,
+not new analytical work). Each verified (vitest + e2e covering entry/midpoint/exit/forward/reverse/
+instant-jump/interrupted/reduced-motion/analytical-preservation + a live-control-during-motion scenario
++ real screenshots at all 3 breakpoints, actually read, AND the full suite re-run) and committed before
+moving to the next. After chapter 6: the full-suite frame-pacing pass across all 6 chapters' heaviest
+interactions together (chapter 3's own measurement is isolated, not a substitute), then an independent
+adversarial review in an isolated worktree per the directive's phase 6, then final release readiness
+per phase 8. Do not claim performance compliance or final acceptance without that evidence.
 
 **Shared work still unbuilt, tracked here rather than silently dropped:** a mobile bottom-sheet pattern
 for controls (chapters 2/3/5/6 all need one per ART_DIRECTION.md's responsive table; none exists yet).

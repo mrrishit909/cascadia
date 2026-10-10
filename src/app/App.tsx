@@ -28,6 +28,7 @@ import { Chapter2Scene } from '../scenes/Chapter2Scene'
 import { BalanceRule } from '../scenes/BalanceRule'
 import { Chapter3Scene } from '../scenes/Chapter3Scene'
 import { CorridorStrip, computeBaselineRails } from '../scenes/CorridorStrip'
+import { Chapter4Scene } from '../scenes/Chapter4Scene'
 import type { Precomputed, SolveResult } from '../engine/types'
 import '../scenes/experience.css'
 
@@ -40,6 +41,7 @@ export function Scene() {
   const introRef = useRef<HTMLElement>(null)
   const ch2Ref = useRef<HTMLElement>(null)
   const ch3Ref = useRef<HTMLElement>(null)
+  const ch4Ref = useRef<HTMLElement>(null)
   const camera = usePresentationCamera()
   // Camera-ownership rule (presentationCamera.ts, phase 3 rule 10): reset to a known-good default the
   // instant the active chapter changes, BEFORE that chapter's own scene gets a chance to claim anything
@@ -93,6 +95,7 @@ export function Scene() {
   let stageRemovedBus: number | null = null
   let stageDisabledLines: number[] = []
   let stageAlteredLines: number[] = []
+  let ch4ResultKey = ''
   if (active === 'ch2') {
     stageResult = diverged2 ? state.result.result : state.baseline.result
   } else if (active === 'ch3') {
@@ -102,6 +105,7 @@ export function Scene() {
     stageResult = diverged4 ? state.result.result : (ch4Fixture?.result ?? state.baseline.result)
     stageRemovedBus = diverged4 ? state.removedBus : 26
     stageDisabledLines = diverged4 ? state.disabledLines : []
+    ch4ResultKey = `${stageRemovedBus}-${stageDisabledLines.join(',')}`
   } else if (active === 'ch6') {
     stageResult = state.result.result
     stageRemovedBus = state.removedBus
@@ -192,7 +196,7 @@ export function Scene() {
       </section>
       <Chapter3Scene sectionRef={ch3Ref} stageRef={stageRef} active={active} railIds={baselineRails} />
 
-      <section id="ch4" className="chapter-section">
+      <section id="ch4" ref={ch4Ref} className="chapter-section">
         <div className="chapter-prose">
           <ChapterTitle sceneId="title-ch4" active={active === 'ch4'}>FIG. 04 &mdash; Outage cascades</ChapterTitle>
           <p>Remove a substation or disable a line to see islands separate and load shed.</p>
@@ -203,6 +207,7 @@ export function Scene() {
           <LineOutage placement="home" />
         </div>
       </section>
+      <Chapter4Scene stageRef={stageRef} sectionRef={ch4Ref} active={active} resultKey={ch4ResultKey} />
 
       <section id="ch5" className="chapter-section">
         <div className="chapter-prose">

@@ -26,6 +26,16 @@ test("axe-core: chapter 3's corridor strip (new decorative SVG rails + real butt
   expect(results.violations).toEqual([]);
 });
 
+test("axe-core: chapter 4's fault ledger has zero violations", async ({ page }) => {
+  await page.goto("/");
+  await scrollToChapter(page, "ch4");
+  const results = await new AxeBuilder({ page }).analyze();
+  if (results.violations.length) {
+    console.log(JSON.stringify(results.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, help: v.help })), null, 1));
+  }
+  expect(results.violations).toEqual([]);
+});
+
 // Architecture-stabilization regression: RemoveNode/AlterCapacity/ScenarioReadout used to each carry
 // their own role="status"/role="alert" element, so a single solve fired up to 6 duplicate screen-reader
 // announcements. StatusRegion/RestorationStatusRegion (App.tsx) are now the ONLY live-announcing

@@ -105,6 +105,17 @@
    visually collided with the shrunk network, caught via a real screenshot. */
 #ch3.chapter-section { padding-top: 280px; }
 @media (max-width: 1023px) { #ch3.chapter-section { padding-top: var(--sp-8); } } /* smaller tablet/mobile insets (160px/96px) don't need the same clearance */
+
+/* Chapter 4's own content (title/prose/ledger/controls) was sitting in normal document flow at the
+   section's own left edge -- the SAME side the stage's own CSS slot rule (above, `width:65%;
+   margin-right:auto`) already puts the network on. For chapter 2 (the split this one mirrors) this is
+   a non-issue because the network is pushed RIGHT there, leaving the content's own left-flow position
+   clear; chapter 4 needed the mirror-image fix explicitly. Caught via a real screenshot (the ledger's
+   own text directly overlapping the network), not assumed. `align-items:flex-end` on the column-flex
+   section pushes every child to the right edge instead. */
+#ch4.chapter-section { align-items: flex-end; }
+#ch4.chapter-section > * { width: 100%; max-width: 420px; }
+@media (max-width: 1023px) { #ch4.chapter-section { align-items: stretch; } #ch4.chapter-section > * { max-width: none; } }
 .chapter-prose { max-width: 62ch; }
 .chapter-controls-column { max-width: 420px; }
 
