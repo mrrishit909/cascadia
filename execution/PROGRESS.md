@@ -997,5 +997,48 @@ REQUIREMENTS.yaml` once the remaining phase-6/phase-8 work below closes it out f
 **Do not claim performance compliance, requirement completion, or final acceptance without the actual
 evidence each item above requires. Do not deploy or publish externally without explicit authorization.**
 
+## Finalization phase 1-3 landed (performance measurement + documentation)
+
+**Full-suite production frame-pacing measurement** (`verification/PERFORMANCE/
+measure_full_suite_framepacing.mjs`, `FULL_SUITE_FRAMEPACING_REPORT.md`): forward scroll, reverse
+scroll, rapid navigation, chapter 3's corridor morph (integrated, not isolated), chapter 4's fracture
+tween, chapter 6's solving feedback (real 1.2s WASM delay), and a live solver update firing DURING
+chapter 4's own motion (the combined worst case) -- all against the production build, glow on, idle
+baseline + mobile/4x-throttled profiles. Every desktop scenario clustered within a 0.4ms band regardless
+of workload; confirmed via an `about:blank` control (zero app code) that this is the test environment's
+own render-timing floor (headless Chromium, no real display compositor), not application cost -- the
+SAME conclusion chapter 3's own earlier isolated measurement reached, now re-confirmed at full-experience
+scale with an even more direct control. The mobile/4x-throttled profile (ART_DIRECTION.md's own stated
+primary target) passes every scenario with real margin. Also checked: repeated full-journey navigation
+(3 cycles through all 7 chapter sections) creates zero stray solver Workers, confirming the per-chapter
+"no Worker from scrolling alone" guarantee holds in aggregate, not just per-chapter in isolation.
+
+**Independent adversarial review commissioned**: a fresh agent (no access to this file, briefed only
+from CLAUDE.md/ART_DIRECTION.md/REQUIREMENTS.yaml/DESIGN_SYSTEM.json and the actual running production
+build) launched in an isolated git worktree, per the directive's own requirement that the reviewer not
+rely on the implementing agent's conclusions. Findings pending -- see the NEXT update to this file for
+the outcome and any fixes it required. Do not treat chapter work as independently verified until that
+update exists.
+
+**Release documentation** (`README.md` rewritten -- was still the unmodified Vite template placeholder;
+new `ARCHITECTURE.md`, `VISUAL_DESIGN.md`, `MOTION_SYSTEM.md`, `DATA_SOURCES.md`, `TESTING.md`,
+`LIMITATIONS.md`, `DEPLOYMENT.md`): each points back to its own real source of truth
+(`ART_DIRECTION.md`, `DESIGN_SYSTEM.json`, `DATA_CONTRACT.yaml`) rather than duplicating it.
+`LIMITATIONS.md` consolidates every deliberate simplification from chapters 3-6 plus the performance
+measurement's own environment-floor finding. `specifications/REQUIREMENTS.yaml` updated: CAS-UX-001 and
+CAS-MOTION-001 both moved to `implemented` (their blocking items are now real), explicitly NOT marked
+`independently verified` pending the review above. CAS-RELEASE-001 stays `unstarted` for the actual
+deploy (not authorized) but now notes the production build and `LIMITATIONS.md` are both already done.
+
 **Shared work still unbuilt, tracked here rather than silently dropped:** a mobile bottom-sheet pattern
 for controls (chapters 2/3/5/6 all need one per ART_DIRECTION.md's responsive table; none exists yet).
+
+## Resume point: finalization in progress
+
+Check `git log --oneline -15` for the most recent commit. All 6 chapters are built and committed.
+Finalization phases 1 (performance) and 3 (documentation) are committed. Phase 2 (independent review) is
+IN PROGRESS as of this update -- check for its findings before continuing to phase 4 (final integration
+gate) or phase 5 (the final acceptance report, `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`, not
+yet created). Do not write that report, and do not declare CASCADIA accepted, until the independent
+review's findings are in hand, any P0/P1 defects are fixed and reverified, and the full suite has been
+re-run fresh one more time afterward.
