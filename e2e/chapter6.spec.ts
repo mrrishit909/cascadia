@@ -182,11 +182,23 @@ test.describe("layout: inspector rail is opaque, flush right, anchored, and clea
         const y = startY + frac * (docHeight - startY - viewport.height);
         await page.evaluate((yy) => window.scrollTo(0, yy), y);
         await page.waitForTimeout(150);
-        const stageBox = await page.locator(".stage-sticky").boundingBox();
+        const stageBox = await page.locator(".stage-sticky .stage-inner").boundingBox();
         const railBox = await page.locator("#ch6 .chapter-controls-column").boundingBox();
         if (!stageBox || !railBox) continue;
         const overlapY = Math.max(0, Math.min(stageBox.y + stageBox.height, railBox.y + railBox.height) - Math.max(stageBox.y, railBox.y));
         if (overlapY === 0) sawStageAwayFromRail = true;
+        else {
+          // REGRESSION (a second fresh independent review, after the first fix above): while the
+          // network is still vertically behind the rail (before it's fully scrolled past), the rail
+          // must cover its FULL horizontal extent too, not leave a margin gap at the sides. `.stage-
+          // inner` lives outside `.chapter-section` (bounded only by `main`'s own padding), while the
+          // rail used to sit inside `.chapter-section`, which added its own extra 16px of horizontal
+          // padding on top -- leaving a thin sliver of "scrolled away" network visible at both page
+          // margins for the whole time the rail covers the viewport. Fixed by zeroing ch6's own
+          // section padding and moving that clearance onto the rail's own padding instead.
+          expect(railBox.x).toBeLessThanOrEqual(stageBox.x);
+          expect(railBox.x + railBox.width).toBeGreaterThanOrEqual(stageBox.x + stageBox.width);
+        }
       }
       // a clean "stacked below" layout must, at some point during the sweep, show the network fully
       // scrolled past (zero vertical overlap with the rail) -- a persistent overlay never does.

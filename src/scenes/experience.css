@@ -202,6 +202,19 @@
      zero overlap" layout this breakpoint requires. `width:100%` plus explicitly zeroing both
      properties is the actual complete reset. */
   #ch6 .chapter-controls-column { position: static; align-self: auto; width: 100%; max-width: none; height: auto; overflow-y: visible; border-left: none; border-top: var(--border-hairline); padding: var(--sp-5) 0 0; margin-right: 0; }
+  /* A second fresh independent review found one more sliver of the same double-padding bug class:
+     `.stage-sticky` lives OUTSIDE `.chapter-section` (a direct child of `main`), so its own width is
+     bounded only by `main`'s own horizontal padding -- but the in-flow rail above is INSIDE
+     `.chapter-section`, which still carries its own generic sp-4 horizontal padding at this
+     breakpoint (the same `.chapter-section { padding: var(--sp-8) var(--sp-4) }` reset every chapter
+     gets), stacking an extra 16px on top of `main`'s own padding. Measured directly: the two elements'
+     edges landed 16px apart, consistently, leaving a thin sliver of the "fully scrolled away" network
+     visible at both page margins for the chapter's entire scroll length instead of none. Zeroing
+     ch6's own horizontal section padding (matching `.stage-sticky`'s own bound exactly) and moving
+     that clearance onto the rail's own padding instead keeps the rail's text inset without the stage
+     peeking through beside it. */
+  #ch6.chapter-section { padding-left: 0; padding-right: 0; }
+  #ch6 .chapter-controls-column { padding-left: var(--sp-4); padding-right: var(--sp-4); }
 }
 .chapter-controls-column { max-width: 420px; }
 
