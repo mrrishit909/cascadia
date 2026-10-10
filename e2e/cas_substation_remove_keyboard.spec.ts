@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { home } from "./helpers/placement";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
@@ -24,11 +25,11 @@ test("remove a substation by keyboard; unserved MW equals sweep total_shed", asy
   await expect(target).toHaveAttribute("aria-pressed", "true");
 
   // Tab to Confirm removal.
-  for (let i = 0; i < 200 && !(await page.getByRole("button", { name: "Confirm removal" }).evaluate(el => el === document.activeElement)); i++) await page.keyboard.press("Tab");
-  const confirm = page.getByRole("button", { name: "Confirm removal" });
+  for (let i = 0; i < 200 && !(await home(page).getByRole("button", { name: "Confirm removal" }).evaluate(el => el === document.activeElement)); i++) await page.keyboard.press("Tab");
+  const confirm = home(page).getByRole("button", { name: "Confirm removal" });
   await expect(confirm).toBeFocused();
   await page.keyboard.press("Enter");
 
-  await expect(page.getByTestId("unserved-mw")).toHaveText(expected);
+  await expect(home(page).getByTestId("unserved-mw")).toHaveText(expected);
   await page.screenshot({ path: path.join(ROOT, "verification/SCREENSHOTS", "cas-int-001-keyboard-remove.png"), fullPage: true });
 });

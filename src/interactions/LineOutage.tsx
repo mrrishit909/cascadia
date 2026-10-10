@@ -8,7 +8,7 @@ import { ScenarioReadout } from './ScenarioReadout'
 // Architecture-stabilization pass: line selection now lives in shared AppState.outageLine (so a second
 // mount shows the same selection); `confirming` stays local/transient per instance, since a confirm
 // dialog mid-flow in one mounted instance has no meaningful "same state" in another.
-export function LineOutage() {
+export function LineOutage({ placement = 'home' }: { placement?: 'home' | 'lab' } = {}) {
   const { state, dispatch, setLineOutage } = useApp()
   const { network, disabledLines, pending, solve, result, outageLine: line } = state
   const [confirming, setConfirming] = useState(false)
@@ -42,7 +42,7 @@ export function LineOutage() {
   const out = line !== null && off.includes(line)
   const islands = result?.result.islands.length ?? 0
   return (
-    <section aria-labelledby={headingId} onKeyDown={e => { if (e.key === 'Escape') setConfirming(false) }}>
+    <section data-placement={placement} aria-labelledby={headingId} onKeyDown={e => { if (e.key === 'Escape') setConfirming(false) }}>
       <h2 id={headingId}>Line outage</h2>
       <label>Line to disable{' '}
         <select value={line ?? ''} disabled={solve === 'solving'} onChange={e => { setConfirming(false); dispatch({ type: 'setOutageLine', line: e.target.value === '' ? null : +e.target.value }) }}>

@@ -15,7 +15,7 @@ const DEBOUNCE_MS = 250
 // (refs can't be shared state, and don't need to be: whichever mounted instance the user is actually
 // interacting with owns firing the debounced Worker call; the shared draft value means both instances
 // display the same thing regardless of which one is doing the firing).
-export function AlterCapacity() {
+export function AlterCapacity({ placement = 'home' }: { placement?: 'home' | 'lab' } = {}) {
   const { state, dispatch, setCapacity } = useApp()
   const { network, result, selectedLine, pending, solve, solveError, capDraft, epoch } = state
   const { factor, allowShed } = capDraft
@@ -79,7 +79,7 @@ export function AlterCapacity() {
     }
   }
   return (
-    <section aria-labelledby={headingId}>
+    <section data-placement={placement} aria-labelledby={headingId}>
       <h2 id={headingId}>Alter line capacity</h2>
       <label>Line{' '}
         <select value={selectedLine ?? ''} onChange={e => dispatch({ type: 'selectLine', line: e.target.value === '' ? null : +e.target.value })}>

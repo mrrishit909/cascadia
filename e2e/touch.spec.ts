@@ -2,6 +2,7 @@
 // coverage until now). Uses a real touch-emulated context (hasTouch: true) at the mobile breakpoint
 // (390x844) and .tap() exclusively -- never .click() -- against the real production build/Worker.
 import { expect, test } from "@playwright/test";
+import { controlHome, home } from "./helpers/placement";
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -13,15 +14,15 @@ test("touch: remove a substation via tap on the SVG, confirm via tap", async ({ 
   // circle's own actual center resolves to the bus, not an overlapping line).
   await page.goto("/");
   await page.locator('[data-testid="bus"][data-bus="26"] circle').first().tap();
-  await page.getByRole("button", { name: "Confirm removal" }).tap();
+  await home(page).getByRole("button", { name: "Confirm removal" }).tap();
   await expect(page.locator('[data-testid="bus"][data-bus="26"]')).toHaveAttribute("data-state", "removed", { timeout: 5000 });
-  await expect(page.getByTestId("unserved-mw")).toHaveText("13.00 MW");
+  await expect(home(page).getByTestId("unserved-mw")).toHaveText("13.00 MW");
 });
 
 test("touch: alter line capacity via tap on the SVG then drag the slider", async ({ page }) => {
   await page.goto("/");
   await page.locator('[data-testid="line"][data-line="9"]').tap();
-  const slider = page.locator('section:has-text("Alter line capacity") input[type=range]');
+  const slider = controlHome(page, "Alter line capacity").locator('input[type=range]');
   await expect(slider).toBeVisible({ timeout: 3000 }); // confirms the tap actually selected line 9 (slider only renders once a line is selected)
   await slider.tap();
   // Confirmed by direct investigation: in a touch-emulated (hasTouch/isMobile) Playwright context,
@@ -33,31 +34,31 @@ test("touch: alter line capacity via tap on the SVG then drag the slider", async
   // tap-to-select-the-line path works on a touch device and that the resulting value change reaches
   // the real Worker solve end to end -- it just can't exercise the drag gesture itself here.
   await slider.fill("0.95");
-  await expect(page.getByTestId("cap-factor")).toHaveText("0.95x", { timeout: 3000 });
+  await expect(home(page).getByTestId("cap-factor")).toHaveText("0.95x", { timeout: 3000 });
 });
 
 test("touch: add a candidate line via tap on its own button", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Add line 0" }).tap();
+  await home(page).getByRole("button", { name: "Add line 0" }).tap();
   await expect.poll(() => page.locator('[data-testid="candidate-line"][data-candidate="0"]').getAttribute("data-added"), { timeout: 3000 }).toBe("true");
 });
 
 test("touch: compare restoration via tap (select preset, tap Compare, tap an order)", async ({ page }) => {
   await page.goto("/");
-  await page.locator('section:has-text("Compare restoration") select').selectOption("two_buses");
-  await page.getByRole("button", { name: "Compare" }).tap();
-  await expect(page.getByTestId("cr-n-orders")).toHaveText("2", { timeout: 5000 });
-  const rows = page.locator('section:has-text("Compare restoration") li button');
+  await controlHome(page, "Compare restoration").locator('select').selectOption("two_buses");
+  await home(page).getByRole("button", { name: "Compare" }).tap();
+  await expect(home(page).getByTestId("cr-n-orders")).toHaveText("2", { timeout: 5000 });
+  const rows = controlHome(page, "Compare restoration").locator('li button');
   await rows.nth(1).tap();
-  await expect(page.getByTestId("cr-chosen-rank")).toHaveText("2");
+  await expect(home(page).getByTestId("cr-chosen-rank")).toHaveText("2");
 });
 
 test("touch: line outage disable+confirm, then restore directly from the SVG via tap", async ({ page }) => {
   await page.goto("/");
-  await page.locator('section:has-text("Line outage") select').selectOption({ index: 1 });
-  await page.getByRole("button", { name: "Disable line" }).tap();
-  await page.getByRole("button", { name: "Confirm outage" }).tap();
+  await controlHome(page, "Line outage").locator('select').selectOption({ index: 1 });
+  await home(page).getByRole("button", { name: "Disable line" }).tap();
+  await home(page).getByRole("button", { name: "Confirm outage" }).tap();
   await expect(page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]')).toBeVisible({ timeout: 3000 });
   await page.locator('[data-testid="line"][data-line="0"][data-outaged="true"]').tap();
-  await expect(page.getByTestId("outage-list")).toHaveText("none", { timeout: 3000 });
+  await expect(home(page).getByTestId("outage-list")).toHaveText("none", { timeout: 3000 });
 });

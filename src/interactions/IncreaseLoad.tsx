@@ -10,7 +10,7 @@ import { ScenarioReadout } from './ScenarioReadout'
 // effect -- which is also what fixed the original select-then-slider race at its root (no gap
 // between "selection changed" and "draft caught up" for an interleaved event to land in). Reset
 // clears loadDraft directly in the reducer, so no epoch-watching effect is needed here at all.
-export function IncreaseLoad() {
+export function IncreaseLoad({ placement = 'home' }: { placement?: 'home' | 'lab' } = {}) {
   const { state, dispatch, setLoadScale } = useApp()
   const { network, loadScale, pending, solve, loadDraft } = state
   const eff = pending?.loadScale ?? loadScale
@@ -20,7 +20,7 @@ export function IncreaseLoad() {
   const base = bus === null ? 0 : network.loads.find(l => l.bus === bus)?.p_mw ?? 0
   const selectBus = (next: number | null) => dispatch({ type: 'setLoadDraft', bus: next, f: next === null ? 1 : eff[next] ?? 1 })
   return (
-    <section aria-labelledby={headingId}>
+    <section data-placement={placement} aria-labelledby={headingId}>
       <h2 id={headingId}>Increase load</h2>
       <label>Load bus{' '}
         <select value={bus ?? ''} onChange={e => selectBus(e.target.value === '' ? null : +e.target.value)}>

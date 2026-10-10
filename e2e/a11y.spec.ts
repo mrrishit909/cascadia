@@ -4,6 +4,7 @@
 // which only runs a subset of axe's own ruleset.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { home } from "./helpers/placement";
 
 test("axe-core: baseline page has zero violations", async ({ page }) => {
   await page.goto("/");
@@ -29,7 +30,7 @@ test("exactly 4 live regions are always mounted; restoration's status text updat
   await expect(liveRegions).toHaveCount(4);
   const restorationStatus = page.getByTestId("restoration-status-region-status");
   await expect(restorationStatus).toHaveText("");
-  await page.getByRole("button", { name: "Compare" }).click();
+  await home(page).getByRole("button", { name: "Compare" }).click();
   await expect(restorationStatus).toHaveText(/restoration orders ranked\./, { timeout: 5000 });
   await expect(liveRegions).toHaveCount(4);
 });

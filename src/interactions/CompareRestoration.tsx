@@ -19,7 +19,7 @@ const factorial = (n: number): number => (n <= 1 ? 1 : n * factorial(n - 1))
 // AppProvider (see state.tsx's restorationSolver/compareRestoration) -- so both mounted instances
 // always show the identical result, and only ONE Worker/WASM load exists regardless of mount count.
 // useId() keeps each instance's own heading id unique when both are mounted simultaneously.
-export function CompareRestoration() {
+export function CompareRestoration({ placement = 'home' }: { placement?: 'home' | 'lab' } = {}) {
   const { state, selectRestorationPreset, compareRestoration, chooseRestoration } = useApp()
   const { network, restoration } = state
   const headingId = useId()
@@ -33,7 +33,7 @@ export function CompareRestoration() {
   const sel = ranking?.[chosen]
 
   return (
-    <section aria-labelledby={headingId}>
+    <section data-placement={placement} aria-labelledby={headingId}>
       <h2 id={headingId}>Compare restoration</h2>
       <p>Hypothetical fault scenarios (synthetic, chosen for this control; not tied to the app&apos;s current scenario above). Ranks every restoration order by served_mw_steps (sum of served MW over the intermediate restoration states, one equal time step per action -- MW&middot;steps, not MWh).</p>
       <label>Fault scenario{' '}

@@ -9,7 +9,7 @@ import { ScenarioReadout } from './ScenarioReadout'
 // (reproduced directly: looping select+immediate-slider-set+Apply without a settle delay lost entire
 // generator reductions). Reset clears genDraft directly in the reducer, so no epoch-watching effect
 // is needed here at all.
-export function ReduceGenerator() {
+export function ReduceGenerator({ placement = 'home' }: { placement?: 'home' | 'lab' } = {}) {
   const { state, dispatch, setGenPmax } = useApp()
   const { network, genPmax, pending, solve, genDraft } = state
   const eff = pending?.genPmax ?? genPmax
@@ -19,7 +19,7 @@ export function ReduceGenerator() {
   if (!network) return null
   const selectGen = (next: number | null) => dispatch({ type: 'setGenDraft', gen: next, mw: next === null ? 0 : eff[next] ?? network.gens[next].pmax_mw })
   return (
-    <section aria-labelledby={headingId}>
+    <section data-placement={placement} aria-labelledby={headingId}>
       <h2 id={headingId}>Reduce generator</h2>
       <label>Generator{' '}
         <select value={gen ?? ''} onChange={e => selectGen(e.target.value === '' ? null : +e.target.value)}>

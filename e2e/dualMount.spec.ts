@@ -5,6 +5,7 @@
 // honestly scoped, not claimed as more than it is. Revisit once chapter scaffolding actually renders a
 // control twice.
 import { expect, test } from "@playwright/test";
+import { controlHome, home } from "./helpers/placement";
 
 test("at most one restoration Worker is ever constructed, across repeated Compare clicks", async ({ page }) => {
   await page.addInitScript(() => {
@@ -21,14 +22,14 @@ test("at most one restoration Worker is ever constructed, across repeated Compar
   await page.goto("/");
   await page.waitForSelector(".provenance");
   // trigger the restoration Worker's lazy creation, then re-trigger with a different preset twice more
-  await page.getByRole("button", { name: "Compare" }).click();
-  await expect(page.getByTestId("cr-n-orders")).toHaveText("6", { timeout: 5000 });
-  await page.locator('section:has-text("Compare restoration") select').selectOption("two_buses");
-  await page.getByRole("button", { name: "Compare" }).click();
-  await expect(page.getByTestId("cr-n-orders")).toHaveText("2", { timeout: 5000 });
-  await page.locator('section:has-text("Compare restoration") select').selectOption("k5_mixed");
-  await page.getByRole("button", { name: "Compare" }).click();
-  await expect(page.getByTestId("cr-n-orders")).toHaveText("120", { timeout: 5000 });
+  await home(page).getByRole("button", { name: "Compare" }).click();
+  await expect(home(page).getByTestId("cr-n-orders")).toHaveText("6", { timeout: 5000 });
+  await controlHome(page, "Compare restoration").locator('select').selectOption("two_buses");
+  await home(page).getByRole("button", { name: "Compare" }).click();
+  await expect(home(page).getByTestId("cr-n-orders")).toHaveText("2", { timeout: 5000 });
+  await controlHome(page, "Compare restoration").locator('select').selectOption("k5_mixed");
+  await home(page).getByRole("button", { name: "Compare" }).click();
+  await expect(home(page).getByTestId("cr-n-orders")).toHaveText("120", { timeout: 5000 });
   const restorationWorkers = await page.evaluate(() => (window as unknown as { __workerCount: number }).__workerCount);
   // exactly 1: the restoration Worker is created lazily on first Compare and reused for every
   // subsequent one, regardless of preset changes -- never re-created per click
