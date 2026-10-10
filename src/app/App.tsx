@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { AppProvider, useApp } from './state'
 import { RemoveNode } from '../interactions/RemoveNode'
 import { AlterCapacity } from '../interactions/AlterCapacity'
@@ -15,6 +16,8 @@ import { FigIndex } from '../scenes/FigIndex'
 import { Chapter4Ledger } from '../scenes/Chapter4Ledger'
 import { useFixture } from '../scenes/useFixture'
 import { chapter2Diverged, chapter3Diverged, chapter4Diverged } from './chapterDivergence'
+import { resetCameraToDefault, usePresentationCamera } from '../scenes/presentationCamera'
+import { IntroBeat1 } from '../scenes/IntroBeat1'
 import type { Precomputed, SolveResult } from '../engine/types'
 import '../scenes/experience.css'
 
@@ -23,6 +26,15 @@ const CHAPTER_IDS = ['intro', 'ch1', 'ch2', 'ch3', 'ch4', 'ch5', 'ch6']
 export function Scene() {
   const { state, dispatch, setLineOutage, setAddedLine } = useApp()
   const active = useActiveChapter(CHAPTER_IDS)
+  const stageRef = useRef<HTMLDivElement>(null)
+  const introRef = useRef<HTMLElement>(null)
+  const camera = usePresentationCamera()
+  // Camera-ownership rule (presentationCamera.ts, phase 3 rule 10): reset to a known-good default the
+  // instant the active chapter changes, BEFORE that chapter's own scene gets a chance to claim anything
+  // -- so a chapter with no camera work of its own (most of them; ART_DIRECTION.md's motion table has
+  // only chapters 2/3 as scroll-scrubbed) never inherits a stale camera left behind by whichever chapter
+  // was active before it.
+  useEffect(() => { resetCameraToDefault(active) }, [active])
   // Story/lab boundary (CHAPTER_ARCHITECTURE.md section 1): ch4's own precomputed fixture, fetched
   // directly, never through the live solver. Chapters 2/3's story is the baseline fixture itself
   // (state.baseline, already loaded) -- confirmed against the plan: both controls' divergence is
@@ -76,8 +88,8 @@ export function Scene() {
           (size/position) is driven by CSS keyed on data-active-chapter (src/scenes/experience.css);
           its CONTENT (which result/removedBus/etc. it shows) is driven by the story/lab switch above. */}
       <div className="stage-sticky" data-active-chapter={active}>
-        <div className="stage-inner">
-          <NetworkView network={state.network} result={stageResult} removedBus={stageRemovedBus}
+        <div className="stage-inner" ref={stageRef}>
+          <NetworkView network={state.network} result={stageResult} removedBus={stageRemovedBus} camera={camera}
             selectedBus={state.selectedBus} onSelect={bus => dispatch({ type: 'select', bus })}
             selectedLine={state.selectedLine} onSelectLine={line => dispatch({ type: 'selectLine', line })}
             alteredLines={stageAlteredLines} disabledLines={stageDisabledLines}
@@ -91,10 +103,17 @@ export function Scene() {
         </div>
       </div>
 
-      <section id="intro" className="chapter-section" data-archetype="immersive">
+      <section id="intro" ref={introRef} className="chapter-section" data-archetype="immersive">
         <h1>CASCADIA</h1>
         <p className="chapter-prose">An electrical grid, reconstructed under computed flow constraints.</p>
       </section>
+      {/* Rendered AFTER the intro <section> deliberately, not just stylistically: React attaches refs
+          and runs layout effects interleaved in JSX sibling order within the same commit, not "every ref
+          in the subtree, then every effect" -- a scene component placed BEFORE the section whose ref it
+          depends on would run its useGSAP layout effect while that ref is still null. Confirmed directly
+          (not assumed): IntroBeat1 silently did nothing in production because introRef.current read null
+          at setup() time when this was ordered before the section; moving it here fixed it. */}
+      <IntroBeat1 stageRef={stageRef} introRef={introRef} active={active} />
 
       <section id="ch1" className="chapter-section" data-archetype="immersive">
         <h2>FIG. 01 &mdash; Grid formation</h2>

@@ -1,5 +1,24 @@
 import "@testing-library/jest-dom/vitest";
 
+// jsdom has no `window.matchMedia` at all -- GSAP's ScrollTrigger plugin calls it unconditionally at
+// registration time (src/scenes/gsapSetup.ts, module load), so without this polyfill every test file
+// that imports anything from src/scenes/ (transitively, via App.tsx) throws "matchMedia is not a
+// function" before a single test in that file can run. `matches: false` is the correct default for
+// jsdom tests: src/scenes/useScene.ts reads `prefers-reduced-motion` through this same API, and the
+// non-reduced-motion code path is what exercises the actual GSAP timelines these tests need to cover.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  window.matchMedia = (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: () => {},
+    removeListener: () => {},
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    dispatchEvent: () => false,
+  }) as MediaQueryList;
+}
+
 // jsdom has no real layout/intersection geometry, so `src/scenes/useActiveChapter.ts`'s real
 // IntersectionObserver either doesn't exist in jsdom or never fires a meaningful callback -- without
 // this mock, `activeChapter` stays stuck at its initial value ('intro') in every component test, so the

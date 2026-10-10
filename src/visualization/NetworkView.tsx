@@ -288,7 +288,7 @@ export function NetworkView({ network, result, removedBus = null, selectedBus = 
       {/* zOrder: network-glow sits under network-core. Duplicated strokes only, no testids, no
           pointer events -- the interactive strokes below remain the only hit targets. */}
       {glowLines.length > 0 && (
-        <g filter={`url(#${filterId})`} aria-hidden="true" pointerEvents="none">
+        <g data-testid="glow-group" filter={`url(#${filterId})`} aria-hidden="true" pointerEvents="none">
           {glowLines.map((gl, i) => <line key={i} x1={gl.x1} y1={gl.y1} x2={gl.x2} y2={gl.y2} stroke={gl.stroke} strokeWidth={gl.width} strokeLinecap="round" />)}
         </g>
       )}
