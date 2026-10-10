@@ -21,7 +21,11 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # jsdom 30's bundled undici uses a webidl API (markAsUncloneable) that doesn't exist on
+          # Node 20 -- "TypeError: webidl.util.markAsUncloneable is not a function" killed every
+          # Vitest worker in the first CI run. Matched to this project's own locally-developed-against
+          # Node version (24.x) instead of guessing a round number.
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npx tsc --noEmit
