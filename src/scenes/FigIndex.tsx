@@ -16,9 +16,9 @@ const ITEMS: { id: string; fig: string; name: string }[] = [
 // ART_DIRECTION.md's motion sheet: scroll-bound chapters' own row says "Direct index navigation
 // lands in the end state" (chapter 2) / "jump snaps to rails" (chapter 3) -- a plain `href="#ch2"`
 // anchor jump lands at the SECTION'S TOP (scrub progress 0), not its end state. Fraction here must
-// match that chapter's own scene's ScrollTrigger `end` (Chapter2Scene.tsx's '60% top'), so a direct
-// jump and a full scroll-through land in the identical place.
-const SCRUB_END_FRACTION: Record<string, number> = { ch2: 0.6 }
+// match that chapter's own scene's ScrollTrigger `end` (Chapter2Scene.tsx's '60% top', Chapter3Scene.tsx's
+// '40% top'), so a direct jump and a full scroll-through land in the identical place.
+const SCRUB_END_FRACTION: Record<string, number> = { ch2: 0.6, ch3: 0.4 }
 
 export function FigIndex({ active }: { active: string }) {
   // ART_DIRECTION.md opening storyboard beat 4 (9-12s): "The FIG index, SKIP/ENTER controls and the

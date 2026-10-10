@@ -4,11 +4,21 @@
 // which only runs a subset of axe's own ruleset.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
-import { controlHome, controlLab, home } from "./helpers/placement";
+import { controlHome, controlLab, home, scrollToChapter } from "./helpers/placement";
 
 test("axe-core: baseline page has zero violations", async ({ page }) => {
   await page.goto("/");
   await page.waitForSelector(".provenance");
+  const results = await new AxeBuilder({ page }).analyze();
+  if (results.violations.length) {
+    console.log(JSON.stringify(results.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, help: v.help })), null, 1));
+  }
+  expect(results.violations).toEqual([]);
+});
+
+test("axe-core: chapter 3's corridor strip (new decorative SVG rails + real buttons) has zero violations", async ({ page }) => {
+  await page.goto("/");
+  await scrollToChapter(page, "ch3");
   const results = await new AxeBuilder({ page }).analyze();
   if (results.violations.length) {
     console.log(JSON.stringify(results.violations.map((v) => ({ id: v.id, impact: v.impact, nodes: v.nodes.length, help: v.help })), null, 1));

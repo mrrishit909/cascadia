@@ -35,9 +35,23 @@
 /* Chapter 2: editorial split, prose-led -- network right, ~55%. */
 .stage-sticky[data-active-chapter="ch2"] .stage-inner { width: 55%; margin-left: auto; margin-right: var(--sp-8); }
 
-/* Chapter 3: focused inspector -- small locator inset, top-left, 20% max width. */
+/* Chapter 3: focused inspector -- small locator inset, top-left, 20% max width. `transform:scale`
+   instead of `width` (unlike every other chapter's own slot rule above): Chapter3Scene's own
+   scroll-scrub measures each rail line's REAL screen position via `getScreenCTM()` against this same
+   stage every scrub tick, and a `width` transition animating over 600ms at the same moment the scrub
+   starts reading geometry would read mid-transition (wrong, constantly-changing) positions -- found
+   during this chapter's own build, not discovered later. `transform` keeps the measurement simple:
+   the inset settles to its final size/position via this one instant (well, 600ms) transition when
+   `active` changes, BEFORE the scroll-scrub itself ever starts measuring anything. */
 .stage-sticky[data-active-chapter="ch3"] { align-items: flex-start; }
-.stage-sticky[data-active-chapter="ch3"] .stage-inner { width: 20%; margin: var(--sp-8) auto 0 var(--sp-8); }
+.stage-sticky[data-active-chapter="ch3"] .stage-inner {
+  width: 100%;
+  margin: var(--sp-8) 0 0 var(--sp-8);
+  transform: scale(0.2);
+  transform-origin: top left;
+  transition: transform 600ms var(--ease-camera, ease);
+}
+@media (prefers-reduced-motion: reduce) { .stage-sticky[data-active-chapter="ch3"] .stage-inner { transition: none; } }
 
 /* Chapter 4: editorial split, canvas-led, mirrored from chapter 2 -- network LEFT, ~65%. */
 .stage-sticky[data-active-chapter="ch4"] .stage-inner { width: 65%; margin-right: auto; margin-left: var(--sp-8); }
@@ -83,7 +97,14 @@
    the default 100vh section left too little runway, and the scrub's own end point had to be moved
    off 'bottom top' to compensate (see Chapter2Scene.tsx's comment on the handoff race this caused,
    found via a real e2e test, not assumed). */
-#ch2.chapter-section { min-height: 200vh; }
+#ch2.chapter-section, #ch3.chapter-section { min-height: 200vh; }
+
+/* Chapter 3's own title/prose/corridor-strip start too close to the top-left corner where the
+   locator inset sits (measured directly: the inset's rendered box is ~237x160px at desktop,
+   starting at the section's own padding origin) -- without this, the title and the first two rails
+   visually collided with the shrunk network, caught via a real screenshot. */
+#ch3.chapter-section { padding-top: 280px; }
+@media (max-width: 1023px) { #ch3.chapter-section { padding-top: var(--sp-8); } } /* smaller tablet/mobile insets (160px/96px) don't need the same clearance */
 .chapter-prose { max-width: 62ch; }
 .chapter-controls-column { max-width: 420px; }
 
@@ -105,6 +126,41 @@
   color: var(--text);
 }
 .balance-rule-row span:first-child { color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; }
+
+/* Chapter 3's corridor strip (ART_DIRECTION.md section 3): the main view once the network has
+   shrunk into its locator inset. Always mounted, shown/hidden via `inert`+opacity driven directly by
+   `active==='ch3'`, same chrome convention as every other always-mounted overlay in this app. */
+.corridor-strip { opacity: 0; transition: opacity 240ms var(--ease-enter, ease); max-width: 640px; }
+.corridor-strip[data-active="true"] { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .corridor-strip { transition: none; } }
+
+.corridor-rails { list-style: none; margin: 0 0 var(--sp-5); padding: 0; display: flex; flex-direction: column; gap: var(--sp-4); }
+.corridor-rails li[data-testid="rail"] { display: flex; align-items: center; gap: var(--sp-4); }
+.rail-line-svg { width: 160px; height: 24px; flex: none; overflow: visible; }
+.rail-readout {
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-3);
+  background: none;
+  border: var(--border-hairline);
+  border-radius: var(--radius-control);
+  padding: var(--sp-2) var(--sp-3);
+  font-family: inherit;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+.rail-readout[aria-pressed="true"] { border-color: var(--copper); }
+.rail-label { font-size: 13px; font-stretch: 75%; font-weight: 600; letter-spacing: 0.04em; }
+.rail-value { font-size: 14px; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.rail-badge { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--copper-hot); }
+.rail-empty { color: var(--text-muted); font-size: 13px; padding: var(--sp-2) 0; }
+
+.corridor-also-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin: 0 0 var(--sp-2); }
+.corridor-also-limit ul, .corridor-also-at-limit ul { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.corridor-also-at-limit button { background: none; border: var(--border-hairline); border-radius: var(--radius-control); color: var(--text-secondary); padding: var(--sp-1) var(--sp-2); cursor: pointer; font-size: 12px; }
 
 .fig-index {
   position: fixed;
@@ -205,13 +261,25 @@
   .stage-sticky { top: 44px; height: calc(100vh - 44px); }
   .stage-sticky[data-active-chapter="ch2"] .stage-inner,
   .stage-sticky[data-active-chapter="ch4"] .stage-inner { width: 100%; margin: 0; height: 55vh; align-self: flex-start; }
-  .stage-sticky[data-active-chapter="ch3"] .stage-inner { width: 96px; margin: var(--sp-3); }
   .chapter-section { padding: var(--sp-8) var(--sp-4); }
   /* ART_DIRECTION.md's responsive table, chapters 2/4 tablet+mobile: "Network on top (55vh), prose
      below" -- without this, the section's own content starts at the section's top padding same as
      every other chapter, directly under/overlapping the fixed 55vh network strip above it (caught via
      a real screenshot: the "Increase load" card sat on top of the network instead of below it). */
   #ch2.chapter-section, #ch4.chapter-section { padding-top: calc(55vh + var(--sp-6)); justify-content: flex-start; }
+}
+
+/* Chapter 3 locator inset, DESIGN_SYSTEM.json's per-breakpoint sizing: tablet 160px top-left, mobile
+   96px top-right (desktop's own 0.2 scale factor above is ~192px against the 960px-wide viewBox --
+   both of these are smaller, deliberately: there is much less room to spare once the corridor strip's
+   own vertical rail list is competing for the same narrow viewport). 160/960 and 96/960 give the scale
+   factors below. */
+@media (min-width: 720px) and (max-width: 1023px) {
+  .stage-sticky[data-active-chapter="ch3"] .stage-inner { transform: scale(0.1667); margin: var(--sp-3); }
+}
+@media (max-width: 719px) {
+  .stage-sticky[data-active-chapter="ch3"] { align-items: flex-start; justify-content: flex-end; }
+  .stage-sticky[data-active-chapter="ch3"] .stage-inner { transform: scale(0.1); transform-origin: top right; margin: var(--sp-3); }
 }
 
 @media (max-width: 719px) {

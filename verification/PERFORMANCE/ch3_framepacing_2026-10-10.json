@@ -1,0 +1,46 @@
+[
+  {
+    "label": "desktop-1440x900",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "throttle": 1,
+    "sampleCount": 176,
+    "p50Ms": 16.7,
+    "p95Ms": 17.7,
+    "maxMs": 18.6,
+    "killCriterionMs": 16.7,
+    "pass": false
+  },
+  {
+    "label": "desktop-1440x900-4x-throttled",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "throttle": 4,
+    "sampleCount": 176,
+    "p50Ms": 16.7,
+    "p95Ms": 17.6,
+    "maxMs": 18.4,
+    "killCriterionMs": 33.3,
+    "pass": true
+  },
+  {
+    "label": "mobile-390x844-4x-throttled",
+    "viewport": {
+      "width": 390,
+      "height": 844
+    },
+    "throttle": 4,
+    "sampleCount": 176,
+    "p50Ms": 16.6,
+    "p95Ms": 17.7,
+    "maxMs": 18.5,
+    "killCriterionMs": 33.3,
+    "pass": true
+  }
+]
+
+AT LEAST ONE PROFILE FAILS the kill criteria -- apply the escalation ladder.

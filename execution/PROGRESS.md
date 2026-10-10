@@ -599,25 +599,143 @@ end-state bug, the stale-tween bug) was invisible to a quick visual glance and o
 actual DOM/computed state or a genuinely independent review, never assumed from reading the code or
 trusting one green test run.
 
-Continue with chapter 3 ("capacity bottlenecks": focused inspector, NO large network at all -- a
-locator inset top-left plus the corridor-strip morph ART_DIRECTION.md section 3 describes), applying
-every lesson above from the start rather than rediscovering them. The last review's chapter-3-specific
-checklist (not yet started, still applies in full): single data source for rail values (the same
-`stageResult`/`chapter3Diverged` App.tsx already computes, binding from `result.binding_lines`, "n/a
-(infeasible)" never 0.00), a fixed rail set (top 4 by \|flow\|/rating from baseline, computed once) plus
-an INSPECTED rail bound to AlterCapacity's actual existing selection state (not a second source of
-truth), an "ALSO AT LIMIT" list of real buttons for off-rail binding lines, rail geometry measured via
-the stage SVG's `getScreenCTM()` re-measured on every scrub update (the inset moves), the CSS
-`width:20%`-with-transition inset-shrink rule replaced by a `transform:scale` driven FROM the scrub
-(not competing with it), the glow group faded out during the transform (this is the project's own
-stated kill-criterion case -- do the fade-during-transform now, don't wait to discover it during
-measurement), and the real tablet (160px top-left) / mobile (96px top-right + plain line list, since
-the inset can't meet 44px touch targets) locator variants. Then chapters 4-6 in order, each verified
-(vitest + real-browser e2e covering entry/midpoint/exit/forward/reverse/instant-jump/interrupted/
-reduced-motion/analytical-preservation + real screenshots at all 3 breakpoints, actually read) and
-committed before moving to the next. After chapter 6: production frame-pacing measurement against
-ART_DIRECTION.md section 4's kill criteria (chapter 4 fracture + a lab node removal, glow on; p95
-<=16.7ms desktop, <=33.3ms mobile/throttled), then an independent adversarial review in an isolated
+## Chapter 3 ("Capacity bottlenecks") landed, including its own performance measurement
+
+Focused inspector archetype: the network shrinks into a top-left locator inset (CSS `transform:scale`,
+not the generic `width`-transition every other chapter's slot uses -- deliberately, see
+`Chapter3Scene.tsx`'s own comment: a `width` transition competing with live `getScreenCTM()` reads
+during the same window would measure mid-transition, wrong positions) and 4 fixed "rails" (the
+baseline's 4 most-loaded lines by \|flow\|/rating, `computeBaselineRails` in `CorridorStrip.tsx`,
+computed once, never reshuffled by a live capacity change) morph from their REAL measured screen
+position in the inset into straight horizontal bars as the user scrolls, each bar's length encoding
+that line's own utilization fraction (flow/rating, clamped at 1).
+
+**Real measured SVG geometry, not a cosmetic approximation**: `Chapter3Scene.tsx` reads each rail
+line's actual `x1/y1/x2/y2` directly off the live `<line data-testid="line-core">` DOM element the
+main stage already renders, transforms those points through the stage SVG's own `getScreenCTM()` (a
+real `DOMPoint.matrixTransform`, accounting for the CSS scale the inset is currently rendered at), and
+linearly interpolates each rail's own overlay `<line>` between that measured start and a fixed
+horizontal end position every scrub tick. A selected line not already a rail becomes a 5th INSPECTED
+rail bound to the SAME `state.selectedLine` AlterCapacity's own `<select>` already uses (no second
+source of truth) -- clicking any rail's own readout button dispatches the identical `selectLine`
+action.
+
+**The same handoff-unreachable-end-state bug chapter 2's review found, hit again and fixed the same
+way, this time BEFORE committing broken work**: a scroll-fraction sweep (same method, confirmed
+directly rather than guessed) showed chapter 3's default-height section handed off to chapter 4 around
+50-60% through, leaving the geometry morph unable to complete while still active. Fixed identically:
+`#ch3.chapter-section` given `min-height: 200vh` and the trigger's own `end` set to `'40% top'`,
+reswept and confirmed to land with real margin (handoff now ~75-80%). `FigIndex.tsx`'s
+`SCRUB_END_FRACTION` map extended with `ch3: 0.4` to match.
+
+**A real layout collision found by an actual screenshot, not assumed**: the chapter's own title and
+first two rails visually overlapped the shrunk locator inset (both sit top-left by default) --
+measured the inset's real rendered footprint (`~237x160px` at desktop) and added `#ch3.chapter-section
+{ padding-top: 280px }` (a smaller tablet/mobile override, since those insets are much smaller) to
+clear it.
+
+**The user's own explicit priority, verified directly**: changing a live simulation control (capacity
+factor via AlterCapacity) WHILE the corridor morph is actively mid-scrub. Confirmed the real DC-OPF
+Worker solve lands correctly, the affected rail's readout updates to the new live result, the rail
+GEOMETRY itself is undisturbed by the state update (Chapter3Scene's own measurement loop doesn't read
+or depend on anything the solve touches, confirmed empirically not just by code inspection), and the
+scrub still converges correctly to its fully-horizontal end state afterward -- `e2e/chapter3.spec.ts`'s
+own dedicated regression test for this exact scenario, plus a page-error listener asserting zero
+uncaught exceptions during the whole sequence.
+
+**Chapter 3's own frame-pacing measurement** (the user's explicit request, not deferred to after
+chapter 6): `verification/PERFORMANCE/measure_ch3_framepacing.mjs` against the real production build,
+glow on. Desktop 1440x900 p95 = 17.7ms, 1.0ms over the strict 16.7ms kill criterion; BOTH throttled/
+mobile profiles (33.3ms criterion, the spec's actual primary target) pass comfortably. An idle-baseline
+control (same page, same sampling loop, zero scrub work) measured p95=17.2ms with NOTHING happening --
+this environment's own vsync/compositor measurement floor sits within 0.5ms of the "failing" desktop
+number regardless of app behavior, and the scrub's real marginal cost (desktop active minus desktop
+idle) is under 1ms, completely insensitive to 4x CPU throttling (strong evidence of negligible real
+JS/layout cost, not a lucky measurement). Full reasoning and the raw numbers:
+`verification/PERFORMANCE/CH3_FRAMEPACING_REPORT.md`. Verdict: does not trigger the escalation ladder;
+ladder step 1 (fade glow during transforms) is already applied proactively in `Chapter3Scene.tsx` for
+the instant inset-shrink transition on chapter entry.
+
+Verified: entry, exit (geometry/camera/corridor-strip all reset), reverse scroll (un-straightens back
+toward network position), instant FIG-index jump (lands with rails already straight), an interrupted
+transition (fast-scrolling straight past chapter 3 leaves no stale geometry), reduced motion (rails
+render straight immediately, confirmed via real `y1`/`y2` SVG attribute reads, not just a screenshot
+glance), the fixed rail set never reshuffling under a live capacity change, the mid-morph live-control
+scenario above, and analytical-state preservation (no solver Worker from scrolling alone) --
+`e2e/chapter3.spec.ts`, 12 tests, stable across a 3x repeat run (36/36). A dedicated axe-core pass
+scrolled to chapter 3 (new decorative SVG + real interactive buttons) found zero violations
+(`e2e/a11y.spec.ts`). Real screenshots at all 3 breakpoints plus reduced motion, actually read, including
+after the layout-collision fix: `verification/SCREENSHOTS/ch3-desktop-1440x900-entry.png`,
+`ch3-desktop-1440x900-mid-morph.png`, `ch3-tablet-768x1024.png`, `ch3-mobile-390x844.png`,
+`ch3-reduced-motion.png`.
+
+Test counts: 61/61 vitest (+4 `computeBaselineRails`), 88/88 e2e (+12 chapter3, +1 a11y), 32/32 pytest,
+clean build.
+
+**Known, deliberate simplification** (not a gap found and left unfixed, a scope call made up front):
+each rail's flow-bar length is normalized against its OWN rating (0-100% of its own limit), not a
+cross-rail MW scale -- this reads as "how close to its own limit" for all 4 rails on one consistent
+axis, which is arguably a BETTER fit for "capacity bottlenecks" than a shared MW scale would be, but
+note it if creative review expects literal MW-proportional bar lengths instead.
+
+## Resume point if this session ends mid-chapter-work
+
+Check `git log --oneline -10` for the most recent commit, and re-read this file plus
+`docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` and `docs/ART_DIRECTION.md` section 4 (storyboard/motion
+table) by then. The shared GSAP lifecycle layer, the FULL intro sequence, `ChapterTitle`, chapter 1, 2,
+and 3 are built, reviewed, verified, and committed. Patterns every subsequent scene should follow:
+- `useScene`, not raw `useGSAP`/`ScrollTrigger`. Every scene's `setup()` kills its own prior work
+  FIRST (`gsap.killTweensOf()` for plain tweens, `tlRef.current?.kill()` for a one-shot timeline) --
+  `useGSAP`'s revert-on-dependency-change is not reliable for either case.
+- A scroll-scrubbed chapter (2 and 3's shared pattern, reusable for 5 if it ends up scroll-driven) needs
+  real scroll runway (`min-height: 200vh` has worked twice now) and a trigger `end` with a REAL,
+  EMPIRICALLY-SWEPT margin before `useActiveChapter`'s own handoff point -- never assume a round number
+  is safe; sweep scroll fraction vs. `data-active-chapter` directly before picking one. One
+  `apply(progress)` function, called from both `onUpdate` and once immediately after
+  `ScrollTrigger.create()`. A `FigIndex.tsx` `SCRUB_END_FRACTION` entry kept in sync with the trigger's
+  own `end`.
+- Camera writes go through `claimCamera`; `Scene`'s own reset in `App.tsx` is in the render body, not a
+  `useEffect` (React's layout-effects-before-passive-effects ordering is tree-wide, not parent-before-
+  child -- do not revert this without re-reading the comment explaining why).
+- When a chapter's own content might visually collide with the persistent stage's current slot
+  (chapters 2/4's top network strip, chapter 3's locator inset), MEASURE the slot's real rendered
+  footprint and clear it with padding -- don't guess a padding value.
+- A chapter whose own scene does real DOM measurement (`getScreenCTM`, `getBoundingClientRect`) needs a
+  `typeof el.getScreenCTM !== 'function'` guard (or equivalent) so vitest/jsdom, which doesn't implement
+  these APIs at all, doesn't crash -- real-browser e2e is that scene's actual geometry coverage, vitest
+  only needs to confirm it mounts/unmounts safely.
+- A performance measurement MUST include an idle-baseline control run through the identical sampling
+  method before concluding a kill-criterion "failure" reflects real app cost -- `measure_ch3_
+  framepacing.mjs`'s own idle-vs-active comparison is the reusable pattern for chapters 4's fracture and
+  the lab's node-removal case, both still owed their own measurement after chapter 6.
+
+**Before trusting ANY chapter's visual or camera/geometry state**, take and READ a real (non-`fullPage`)
+screenshot at the chapter's actual scroll position, AND cross-check the specific thing that matters via
+direct `evaluate`/`getAttribute`/SVG-property reads -- every real bug found across chapters 1-3 (the
+background bug, the effect-ordering bug, two separate unreachable-end-state bugs, the stale-tween bug,
+the layout-collision bug) was invisible to a quick glance and only surfaced by checking actual DOM/
+computed state or a genuinely independent review, never assumed from reading the code or trusting one
+green test run.
+
+Continue with chapter 4 ("outage cascades": editorial split, canvas-led, mirrored from chapter 2 --
+network LEFT ~65%, a fault ledger right listing removed element/island count/isolated MW/shed MW/
+objective change, the single-LP disclaimer directly under the numbers). Load-bearing per
+ART_DIRECTION.md section 3's own "single-shot rule": ONE 700ms tween for the ENTIRE baseline-to-post-
+fault transition (kerf opens, islands translate 24px apart, affected lines go de-energized, ledger
+numbers swap at the END, never mid-tween) -- no stagger by graph distance, no sequential/cascading
+visual trips, because either would visually claim a cascading-trip model this engine does not
+implement (the disclaimer text "Single LP solve after the fault. Cascading trips are not modeled."
+must appear in the ledger, matching `LIMITATIONS.md`). `Chapter4Ledger.tsx` already exists with the
+real numbers (built during the earlier chapter-shell phase) -- read it before assuming it needs to be
+rebuilt; this pass is about the MOTION (the single tween + island-separation), not the analytical
+content, which is already correct. Trigger is "single trigger, not scrub" per the motion table (ch4 is
+NOT scroll-scrubbed like 2/3), so this is a one-shot `useScene` timeline like `IntroSequence`/
+`ChapterTitle`, not a new `ScrollTrigger.create` scrub pattern. Then chapters 5-6, each verified
+(vitest + e2e covering entry/midpoint/exit/forward/reverse/instant-jump/interrupted/reduced-motion/
+analytical-preservation + a live-control-during-motion scenario like chapter 3's own + real screenshots
+at all 3 breakpoints, actually read) and committed before moving to the next. After chapter 6: the
+full-suite frame-pacing pass across all 6 chapters' heaviest interactions together (chapter 3's own
+measurement above is isolated, not a substitute), then an independent adversarial review in an isolated
 worktree per the directive's phase 6, then final release readiness per phase 8. Do not claim
 performance compliance or final acceptance without that evidence.
 

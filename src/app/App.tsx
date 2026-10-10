@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useMemo, useRef } from 'react'
 import { AppProvider, useApp } from './state'
 import { RemoveNode } from '../interactions/RemoveNode'
 import { AlterCapacity } from '../interactions/AlterCapacity'
@@ -26,6 +26,8 @@ import { ChapterTitle } from '../scenes/ChapterTitle'
 import { LegendPlate } from '../scenes/LegendPlate'
 import { Chapter2Scene } from '../scenes/Chapter2Scene'
 import { BalanceRule } from '../scenes/BalanceRule'
+import { Chapter3Scene } from '../scenes/Chapter3Scene'
+import { CorridorStrip, computeBaselineRails } from '../scenes/CorridorStrip'
 import type { Precomputed, SolveResult } from '../engine/types'
 import '../scenes/experience.css'
 
@@ -37,6 +39,7 @@ export function Scene() {
   const stageRef = useRef<HTMLDivElement>(null)
   const introRef = useRef<HTMLElement>(null)
   const ch2Ref = useRef<HTMLElement>(null)
+  const ch3Ref = useRef<HTMLElement>(null)
   const camera = usePresentationCamera()
   // Camera-ownership rule (presentationCamera.ts, phase 3 rule 10): reset to a known-good default the
   // instant the active chapter changes, BEFORE that chapter's own scene gets a chance to claim anything
@@ -68,6 +71,10 @@ export function Scene() {
   const ch4Fixture = useFixture<Precomputed>('precomputed/ch4_fault_bus26.json')
   const introFixture = useFixture<Precomputed>('precomputed/intro_fault_line33.json')
   const introFaultActive = useIntroFaultActive()
+  // ART_DIRECTION.md section 3: computed ONCE from the baseline fixture, never re-derived from a
+  // diverged live result -- the rail SET must stay fixed while capacity changes, only the readouts
+  // inside each rail update.
+  const baselineRails = useMemo(() => state.network && state.baseline ? computeBaselineRails(state.network, state.baseline.result) : [], [state.network, state.baseline])
 
   if (state.load === 'loading') return <p role="status">Loading baseline</p>
   if (state.load === 'error' || !state.network || !state.result || !state.baseline) return <p role="alert">Could not load data: {state.error}</p>
@@ -172,15 +179,18 @@ export function Scene() {
       </section>
       <Chapter2Scene sectionRef={ch2Ref} active={active} />
 
-      <section id="ch3" className="chapter-section">
+      <section id="ch3" ref={ch3Ref} className="chapter-section">
         <div className="chapter-prose">
           <ChapterTitle sceneId="title-ch3" active={active === 'ch3'}>FIG. 03 &mdash; Capacity bottlenecks</ChapterTitle>
           <p>Alter a line&apos;s thermal capacity and watch its binding status update.</p>
         </div>
+        <CorridorStrip active={active === 'ch3'} network={state.network} result={stageResult} railIds={baselineRails}
+          selectedLine={state.selectedLine} onSelectLine={line => dispatch({ type: 'selectLine', line })} />
         <div className="chapter-controls-column">
           <AlterCapacity placement="home" />
         </div>
       </section>
+      <Chapter3Scene sectionRef={ch3Ref} stageRef={stageRef} active={active} railIds={baselineRails} />
 
       <section id="ch4" className="chapter-section">
         <div className="chapter-prose">
