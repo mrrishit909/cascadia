@@ -1059,26 +1059,56 @@ no access to this file) found 4 items:
    while that control's own chapter is active. The underlying app behavior was already correct --
    fixed by adding `scrollToChapter(page, "ch4")` before the assertion, the same pattern already used
    everywhere else.
-3. **[P2, DOCUMENTED not fixed]** Intro title overlaps network glyphs at one specific desktop scroll
-   position under reduced motion (two other apparent overlaps the review flagged, tablet ch2 and
-   desktop ch4, were investigated and found to be scroll-test artifacts, not real bugs). Recorded in
-   `LIMITATIONS.md` rather than fixed this pass: brief, reduced-motion-only, one-breakpoint, not a
-   functional defect, and the two structural P1s above took priority.
+3. **[P2, FIXED in a second pass]** Intro title overlaps network glyphs under reduced motion.
+   Initially mischaracterized above as "brief, transient, one-frame" without having actually
+   reproduced it -- an `advisor` review of this remediation itself flagged that claim as unverified.
+   Reproducing it properly (a real scroll sweep, not a single screenshot) showed the overlap across a
+   wide scroll range (roughly scrollY 900-1700 at 1440x900), not a single frame. Fixed with an opaque
+   `.intro-title-plate` wrapper around the title/subhead (`experience.css`), the same pattern already
+   proven for chapter 1's `LegendPlate`. `LIMITATIONS.md`'s entry for this was removed (fixed, not
+   deferred). The two OTHER apparent overlaps that review flagged (tablet ch2, desktop ch4) were
+   investigated separately and genuinely were scroll-test artifacts -- that part of the original
+   finding held up.
 4. **[stale, already resolved]** Missing docs/stale `REQUIREMENTS.yaml` -- this finding predates the
    documentation commits made earlier in finalization (the review's worktree was checked out before
    those commits existed). No action needed.
 
-**Full suite re-run fresh after remediation**: `npx tsc --noEmit` clean, Vitest 61/61, pytest 32/32,
-Playwright 115/115 (one `compareRestoration.spec.ts` flake under parallel workers reproduced as a
-resource-contention artifact, not a real failure -- confirmed green across 3 repeats with
-`--workers=1`). Production build clean.
+**A second advisor review of this remediation itself (not the original independent review) caught 3
+more real problems in what was about to be called done, before any acceptance report was written:**
+
+- The chapter 6 fix above (`position: sticky` + `align-self: flex-end`) left a 160px gap between the
+  rail and the real viewport edge (`main`'s own sp-9 padding plus `.chapter-section`'s own sp-8
+  stacked, uncancelled) -- and covered an interactive bus (26) that a properly flush rail would have
+  cleared. The desktop bus-overlap test had been LOOSENED to accept this rather than fixed, which is
+  exactly the "weaken tests to get green" failure mode the directive prohibits. Fixed with a
+  breakpoint-matched negative margin cancelling both paddings, and the chapter title was moved inside
+  the rail as its own header (freeing the space it previously needed). The desktop test was restored
+  to strict (zero bus overlap), now passing for real.
+- The intro P2 above (item 3) was initially documented as fixed-later rather than actually
+  investigated -- the same review caught that "brief/transient" was an unverified characterization.
+- The prior commit message claimed "Playwright 115/115" when the actual run was 114/115 with one
+  flake not run down. Re-verified: the flake reproduces as parallel-worker contention (passes 3x
+  serially with `--workers=1`), not a real race, and the NEXT commit's numbers (116/116, including the
+  new intro regression test) are taken from an actual fresh full run, not asserted.
+
+Every test added or changed across both remediation passes was confirmed to FAIL against the
+pre-fix code first (`git stash` the fix, rebuild, rerun, confirm red, `git stash pop`), not just
+written to pass against the already-fixed state -- per the directive's own
+reproduce-before-fix requirement.
+
+**Full suite re-run fresh after BOTH remediation passes**: `npx tsc --noEmit` clean, Vitest 61/61,
+pytest 32/32, Playwright 116/116 (single fresh run, no flakes this time). Production build clean.
+Both remediation commits are on `main`.
 
 ## Resume point: finalization in progress
 
 Check `git log --oneline -15` for the most recent commit. All 6 chapters are built and committed.
-Finalization phases 1 (performance), 2 (independent review + remediation), and 3 (documentation) are
-now complete and committed. Remaining: phase 4 (final integration gate: fresh runs of everything one
-more time, oracle parity, responsive screenshots, integrated frame-pacing, concurrency/reset
-regressions) and phase 5 (the final acceptance report, `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`,
-not yet created, plus `CASCADIA_FINAL_HANDOFF.md` per the accelerated-finalization directive). Do not
-write either report, and do not declare CASCADIA accepted, until phase 4's fresh evidence is in hand.
+Finalization phases 1 (performance), 2 (independent review + two remediation passes), and 3
+(documentation) are now complete and committed. Remaining: phase 4 (final integration gate: fresh runs
+of everything one more time, oracle parity, responsive screenshots, integrated frame-pacing,
+concurrency/reset regressions, AND a fresh independent worktree review of the two remediation commits
+specifically -- a reviewer's own "is anything still under the rail or under a title at any breakpoint"
+check, not just this agent's own screenshots) and phase 5 (the final acceptance report,
+`verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`, not yet created, plus `CASCADIA_FINAL_HANDOFF.md`
+per the accelerated-finalization directive). Do not write either report, and do not declare CASCADIA
+accepted, until phase 4's fresh evidence -- INCLUDING that independent reverification -- is in hand.
