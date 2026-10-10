@@ -187,7 +187,59 @@ migration itself is proven safe in isolation.
 - A worktree-isolated independent reviewer should cover all of this plus the original 10-item
   architecture acceptance gate before any GSAP/chapter code is written (user's explicit requirement).
 
+## Independent worktree review completed (opus, HEAD `96d178c`) -- 3 P1s fixed, commit `d9b5c7c`
+
+Returned **NO-GO** for chapter/GSAP work with 3 P1 blockers, all reproduced before fixing then
+mutation-checked: (1) LineOutage confirm dialogs re-targeted by another mounted instance changing the
+shared line selection -- a destructive action could be confirmed against the wrong line; (2) `<output>`
+elements' implicit `role="status"` duplicated live announcements a third, previously-invisible way (not
+caught by axe or the CSS-attribute-based live-region count); (3) no permanent e2e test ever drove the
+real lab placement. All fixed; see commit `d9b5c7c`'s message for full detail. Verified: 35/35 vitest,
+48/48 e2e (incl. axe-core), 26/26 pytest.
+
+The review also confirmed, independently (worth trusting over self-report alone): the architecture is
+otherwise sound -- exactly one Worker per `AppProvider` (main + restoration) regardless of mount count,
+shared drafts sync correctly in both directions, every `[id]` stays unique, and every test-count claim
+in this file was real at time of review. Locator scoping (`home`/`controlHome`) was spot-checked across
+4 e2e files not touched by any bug fix and found correctly applied everywhere.
+
+**Review findings deliberately deferred (not silently dropped), ranked by the review's own P2/P3 split
+-- land these alongside chapter work, not necessarily before it:**
+- P2: the visible status plate `DESIGN_SYSTEM.json`'s `componentStates.statusRegion` token specifies
+  (colors/glyphs per state, RETRY/UNDO LAST CHANGE actions, 60%-opacity-while-solving) still doesn't
+  exist; the `.sr-only` live regions satisfy the announcement requirement only, not this. Also still
+  missing: the token's `initial`/`empty`/`cancelled`/`missingFixture` states (a superseded solve is
+  currently swallowed silently, no "Superseded by newer input" shown anywhere) and reconciling the
+  token's `ariaLive: polite`-for-everything with the current `role="alert"` (assertive) on error/
+  infeasible.
+- P2: `chapterDivergence.test.ts` hand-builds its test objects instead of going through the real
+  `setLoadScale`/reducer -- would still pass if the key-deletion-on-revert behavior it depends on
+  regressed. Should exercise the real actions instead.
+- P2: chapter 5's divergence semantics are underspecified in the code as it stands --
+  `reset` never touches `AppState.restoration` (so chapter 5 stays "diverged" after a baseline reset),
+  and `restorationLoading`/`restorationPreset` both clear `ranking` (so chapter 5 flips back to its story
+  fixture on every Compare click and every preset change, not just a real user-initiated reset). Decide
+  the intended behavior before wiring chapter 5's fixture/live-result switch to this predicate.
+- P2: `LabStub`'s nested-panel layout (padding compounds, cramped at 390px) and heading levels (its own
+  controls render `<h2>` at the same level as the stub's own "Scenario laboratory" `<h2>`, should be
+  `<h3>`) -- stub-only issues, the real chapter 6 shell replaces this layout entirely.
+- P2: drop `AddLine`'s inconsistent "home" mount in `LabStub` (lab-only per `ART_DIRECTION.md`'s chapter
+  table) and move its e2e tests from `home()`/`controlHome()` to `lab()`/`controlLab()` once that's
+  decided -- 7 locators currently depend on the home mount existing (`addLine.spec.ts` lines 16, 26, 53,
+  67, 77, 95, `touch.spec.ts:42`); all fail loudly rather than pass for the wrong reason today, so this
+  is safe to defer, not a silent landmine.
+- P3: neither Worker (main solver, restoration) is ever terminated on `AppProvider` unmount.
+- P3: `concurrency.spec.ts:92`'s `getByText(/Solving/).first()` now resolves to the hidden StatusRegion
+  node rather than a visible control's own text -- still passes, but no longer proves what its comment
+  claims.
+- P3: `controlHome`/`controlLab`'s text-based `.filter({hasText})` matching is substring-fragile to
+  future heading copy changes.
+- P3: running the e2e suite regenerates (and the harness must re-commit)
+  `verification/SCREENSHOTS/cas-int-001-keyboard-remove.png` -- expected, not a bug, but worth remembering
+  when reviewing a diff that touches this file for no apparent reason.
+
 ## Resume point if this session ends mid-chapter-work
 
 Check `git log --oneline -10` for the most recent commit, and re-read this file plus
-`docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` by then.
+`docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` by then. The independent review's GO/NO-GO gate has now
+passed (P1s fixed); chapter/GSAP work may begin, with the P2/P3 list above tracked alongside it.
