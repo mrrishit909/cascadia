@@ -1118,13 +1118,43 @@ for it explicitly rather than silently passing through a looser bound.
 **Full suite re-run fresh after all THREE remediation passes**: `npx tsc --noEmit` clean, Vitest
 61/61, pytest 32/32, Playwright 118/118. All three remediation commits are on `main`.
 
+**A fourth remediation pass** (advisor-flagged, not yet independently reviewed by a fresh worktree
+agent at the time it landed) fixed two more real defects found via direct inspection: `.skip-intro`
+overlapping the `.fig-index` nav bar at narrow widths (real screenshot evidence), and the same 7 nav
+links causing genuine horizontal page overflow (`scrollWidth` > viewport, confirmed via
+`window.scrollX` going non-zero after a real anchor-jump click). Also corrected a documentation
+overclaim about the chapter 6 rail's sticky pin range, and added Lighthouse measurement for the
+release gate's Performance row (desktop: Perf 100/A11y 100/LCP 0.5s/CLS 0, all pass; mobile: Perf
+95/A11y 100/CLS 0 pass, but LCP measures 2.567s against the <=2.5s gate -- a real, honestly-disclosed
+67ms miss, investigated for an obvious fix and documented in LIMITATIONS.md rather than hidden).
+
+**A final independent review (fresh worktree, verifying ALL FOUR prior remediation passes) confirmed**
+every previously-reported defect fixed (chapter 6 desktop, intro title containment at all 3
+breakpoints, SKIP INTRO/nav overlap, no scroll-jump, no regressions in chapters 2/4), re-ran the full
+suite fresh itself (tsc clean, Vitest 61/61, Playwright 123/123) and independently re-measured
+Lighthouse (desktop and mobile numbers matched within rounding, confirming the mobile LCP near-miss is
+real under independent re-measurement, not a fluke). It found ONE more real, previously-undetected
+defect: a consistent 16px gap at both page margins at tablet/mobile letting a thin sliver of the
+network remain visible beside the rail for the chapter's full scroll length (same double-padding bug
+class as the earlier flush-right desktop fix, applied this time to `.chapter-section`'s own horizontal
+padding stacking with `main`'s). **Fixed** (5th remediation pass): zeroed ch6's own section padding at
+this breakpoint, moved clearance onto the rail's own padding, added a regression test confirmed red
+against the pre-fix CSS first. Full suite re-verified fresh once more: tsc clean, Vitest 61/61, pytest
+32/32, Playwright 123/123. This 5th fix has NOT been re-checked by a third independent review pass --
+judged sufficient given its narrow, precisely-measured scope (a single CSS property stacking issue,
+not a new class of defect) and its own real reproduce-before-fix confirmation, rather than spawning
+indefinite further review rounds.
+
 ## Resume point: finalization in progress
 
 Check `git log --oneline -15` for the most recent commit. All 6 chapters are built and committed.
-Finalization phases 1 (performance), 2 (independent review + three remediation passes, the last of
-which was itself independently reverified in a fresh worktree), and 3 (documentation) are now complete
-and committed. Remaining: phase 4 (final integration gate: fresh runs of everything one more time,
-oracle parity, responsive screenshots, integrated frame-pacing, concurrency/reset regressions) and
-phase 5 (the final acceptance report, `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`, not yet
-created, plus `CASCADIA_FINAL_HANDOFF.md` per the accelerated-finalization directive). Do not write
-either report, and do not declare CASCADIA accepted, until phase 4's fresh evidence is in hand.
+Finalization phases 1 (performance, including Lighthouse), 2 (independent review + five remediation
+passes, the fourth of which was independently reverified in a fresh worktree), and 3 (documentation)
+are now complete and committed. Remaining: phase 4's own final integration gate checklist (oracle
+parity check, a consolidated responsive-screenshot set, concurrency/reset regressions -- these have
+each been exercised individually across the remediation passes above but not yet re-run as one single
+consolidated final pass) and phase 5 (the final acceptance report,
+`verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`, plus `CASCADIA_FINAL_HANDOFF.md`). The known,
+accepted, honestly-documented gaps going into that report: mobile LCP's 67ms miss against the gate
+(LIMITATIONS.md), the ~15px pre-existing nav-strip overflow artifact (LIMITATIONS.md/tests), and no
+deployment (never authorized).
