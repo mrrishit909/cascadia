@@ -22,6 +22,8 @@ import { SkipIntro } from '../scenes/SkipIntro'
 import { useIntroFaultActive, setIntroFaultActive } from '../scenes/introFixtureState'
 import { setIntroChromeVisible } from '../scenes/introChromeState'
 import { setIntroSkipped } from '../scenes/introSkipState'
+import { ChapterTitle } from '../scenes/ChapterTitle'
+import { LegendPlate } from '../scenes/LegendPlate'
 import type { Precomputed, SolveResult } from '../engine/types'
 import '../scenes/experience.css'
 
@@ -134,14 +136,12 @@ export function Scene() {
           at setup() time when this was ordered before the section; moving it here fixed it. */}
       <IntroSequence stageRef={stageRef} introRef={introRef} active={active} network={state.network} flows={state.baseline.result.flows} />
 
-      <section id="ch1" className="chapter-section" data-archetype="immersive">
-        <h2>FIG. 01 &mdash; Grid formation</h2>
-        <p className="chapter-prose">The IEEE case30 network at baseline dispatch.</p>
-      </section>
+      <section id="ch1" className="chapter-section" data-archetype="immersive" />
+      <LegendPlate active={active === 'ch1'} network={state.network} baseline={state.baseline} />
 
       <section id="ch2" className="chapter-section">
         <div className="chapter-prose">
-          <h2>FIG. 02 &mdash; Demand and generation</h2>
+          <ChapterTitle sceneId="title-ch2" active={active === 'ch2'}>FIG. 02 &mdash; Demand and generation</ChapterTitle>
           <p>Raise load at a bus or reduce a generator&apos;s output limit to see dispatch respond.</p>
         </div>
         <div className="chapter-controls-column">
@@ -152,7 +152,7 @@ export function Scene() {
 
       <section id="ch3" className="chapter-section">
         <div className="chapter-prose">
-          <h2>FIG. 03 &mdash; Capacity bottlenecks</h2>
+          <ChapterTitle sceneId="title-ch3" active={active === 'ch3'}>FIG. 03 &mdash; Capacity bottlenecks</ChapterTitle>
           <p>Alter a line&apos;s thermal capacity and watch its binding status update.</p>
         </div>
         <div className="chapter-controls-column">
@@ -162,7 +162,7 @@ export function Scene() {
 
       <section id="ch4" className="chapter-section">
         <div className="chapter-prose">
-          <h2>FIG. 04 &mdash; Outage cascades</h2>
+          <ChapterTitle sceneId="title-ch4" active={active === 'ch4'}>FIG. 04 &mdash; Outage cascades</ChapterTitle>
           <p>Remove a substation or disable a line to see islands separate and load shed.</p>
         </div>
         <Chapter4Ledger />
@@ -174,7 +174,7 @@ export function Scene() {
 
       <section id="ch5" className="chapter-section">
         <div className="chapter-prose">
-          <h2>FIG. 05 &mdash; Recovery plans</h2>
+          <ChapterTitle sceneId="title-ch5" active={active === 'ch5'}>FIG. 05 &mdash; Recovery plans</ChapterTitle>
           <p>Compare restoration sequences by served energy.</p>
         </div>
         <div className="chapter-controls-column">
@@ -183,7 +183,7 @@ export function Scene() {
       </section>
 
       <section id="ch6" className="chapter-section" aria-label="Scenario laboratory">
-        <h2>FIG. 06 &mdash; Scenario laboratory</h2>
+        <ChapterTitle sceneId="title-ch6" active={active === 'ch6'}>FIG. 06 &mdash; Scenario laboratory</ChapterTitle>
         <div className="chapter-controls-column">
           <RemoveNode placement="lab" />
           <AlterCapacity placement="lab" />

@@ -57,6 +57,23 @@
   flex-direction: column;
   justify-content: center;
   pointer-events: none; /* re-enabled on real content below, so empty chapter padding doesn't eat clicks meant for the stage behind it */
+  /* index.css's generic `section{background,border}` rule (for control-panel cards like
+     IncreaseLoad/ReduceGenerator, which ARE plain <section>s) was silently leaking into every
+     chapter shell section too, painting an OPAQUE --surface rectangle directly over the persistent
+     stage (z-index 1) on every real scroll. Invisible in this project's own earlier chapter-shell
+     screenshots only because those used Playwright's `fullPage: true`, which freezes a
+     `position: sticky` element at its initial flow offset instead of truly re-pinning it per
+     viewport -- caught here by taking a REAL (non-fullPage) screenshot at the chapter's actual
+     scroll position, exactly what this directive's visual-QA step exists to catch. Chapters provide
+     their own framing (chapter-prose/chapter-controls-column/legend-plate/fault-ledger/etc.), not a
+     full-section card.
+     PARTIAL FIX: the 3 chapters with a camera-scrub/visual canvas handoff (1 immersive, 2 split,
+     4 split) need this NOW to make the stage visible at all. Chapters 3/5/6's own corridor-strip/
+     comparison-columns/inspector-rail layouts are not yet built and may re-introduce their own
+     intentional card framing per ART_DIRECTION.md -- revisit this override per chapter as each is
+     built, not all transparent by default forever. */
+  background: transparent;
+  border: none;
 }
 .chapter-section > * { pointer-events: auto; }
 .chapter-section[data-archetype="immersive"] { justify-content: flex-end; }
@@ -110,6 +127,53 @@
   z-index: 20;
 }
 
+/* ART_DIRECTION.md section 3, chapter 1's legend plate (DESIGN_SYSTEM.json's grid.legendPlate
+   token): "cols 1-4, bottom-anchored, 24px from viewport bottom" desktop. Fixed to the viewport, not
+   in document flow -- same always-mounted/CSS-toggled chrome pattern as FigIndex/ResetButton/
+   SkipIntro, driven directly by `active==='ch1'` (src/scenes/LegendPlate.tsx). */
+.legend-plate {
+  position: fixed;
+  left: var(--sp-5);
+  bottom: var(--sp-5);
+  z-index: 10;
+  max-width: 360px;
+  border: var(--border-hairline);
+  background: var(--surface);
+  padding: var(--sp-4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms var(--ease-enter, ease);
+}
+.legend-plate[data-active="true"] { opacity: 1; pointer-events: auto; }
+.legend-plate h2 { font-size: 20px; line-height: 24px; margin: 0 0 var(--sp-2); }
+.legend-plate-prose {
+  font-size: 14px;
+  line-height: 20px;
+  font-stretch: 87.5%;
+  font-weight: 420;
+  color: var(--text-secondary);
+  margin: 0 0 var(--sp-4);
+}
+.legend-plate-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--sp-4);
+  font-size: 12px;
+  line-height: 16px;
+  font-stretch: 75%;
+  font-weight: 560;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+.legend-plate-row + .legend-plate-row { margin-top: var(--sp-2); }
+.legend-plate-row span:last-child { color: var(--text); font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .legend-plate { transition: none; } }
+
+@media (min-width: 720px) and (max-width: 1023px) {
+  .legend-plate { max-width: 440px; } /* tablet: cols 1-5, still bottom-anchored */
+}
+
 @media (max-width: 1023px) {
   .fig-index { left: 0; top: 0; transform: none; flex-direction: row; width: 100%; padding: var(--sp-3) var(--sp-4); background: var(--surface); position: sticky; }
   .stage-sticky { top: 44px; height: calc(100vh - 44px); }
@@ -117,4 +181,9 @@
   .stage-sticky[data-active-chapter="ch4"] .stage-inner { width: 100%; margin: 0; height: 55vh; align-self: flex-start; }
   .stage-sticky[data-active-chapter="ch3"] .stage-inner { width: 96px; margin: var(--sp-3); }
   .chapter-section { padding: var(--sp-8) var(--sp-4); }
+}
+
+@media (max-width: 719px) {
+  /* mobile: legend plate moves to top, below the FIG index strip, full width minus margins */
+  .legend-plate { left: var(--sp-4); right: var(--sp-4); bottom: auto; top: 60px; max-width: none; }
 }

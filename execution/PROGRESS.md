@@ -395,15 +395,93 @@ chapter shell's tablet/mobile CSS breakpoints. Remaining P2/P3 items from the ea
 (visible status plate, chapterDivergence.test.ts going through the real reducer, Worker termination on
 unmount) still tracked, land alongside chapter work.
 
+## Chapter 1 ("Grid formation") landed
+
+Per the "COMPLETE SIX-CHAPTER CHOREOGRAPHY" directive, beginning with chapter 1 (immersive canvas,
+section 3's simplest archetype, and the one chapter that reuses the intro's own already-verified
+baseline-display logic rather than introducing new analytical branching).
+
+**A real pre-existing bug found before any chapter motion could be verified at all:** the FIRST real
+(non-`fullPage`) screenshot ever taken of a chapter mid-scroll showed the persistent stage completely
+blank. Traced to `index.css`'s generic `section { background: var(--surface); border: ... }` rule
+(written for control-panel cards like IncreaseLoad/ReduceGenerator, which are plain `<section>`s)
+silently also painting an OPAQUE rectangle over every `.chapter-section`, hiding the shared stage
+(z-index 1 vs. the section's z-index 2) on every real scroll. This was invisible in every screenshot
+this project had taken of the chapter shell before now because they all used Playwright's
+`fullPage: true`, which freezes a `position: sticky` element at its initial flow offset instead of
+re-pinning it per virtual viewport slice -- a known Chromium/Playwright limitation, not a quirk of
+this app. Confirmed via direct `getComputedStyle` inspection (`backgroundColor: rgb(15,23,34)`
+covering the full viewport rect) before fixing, not assumed. Fixed: `.chapter-section` now explicitly
+overrides `background: transparent; border: none`, with a comment flagging that chapters 3/5/6 may
+want to reintroduce their OWN intentional card framing once their corridor-strip/comparison-columns/
+inspector-rail layouts are built, so this default should be revisited per chapter, not assumed
+permanent. This fix touches every chapter, so it was verified against the FULL existing e2e suite
+(64/64 green) before trusting it, not just chapter 1's own new tests.
+
+**New shared primitive, reused by all 6 chapters:** `src/scenes/ChapterTitle.tsx` -- the motion
+sheet's "masked text reveal... chapter titles only, 800ms, once per entry, replay on index
+navigation" effect, implemented as a `clip-path: inset()` vertical wipe driven directly by each
+chapter's own `active` prop (same `useScene`/`active`-driven pattern as the intro, not a second
+competing ScrollTrigger mechanism). "Replay on index navigation" falls out for free: FigIndex clicks
+and real scrolling both flow through the same `useActiveChapter` value. Wired onto all 6 existing
+chapter `<h2>` headings in `App.tsx` in this same pass (cheap to do once, avoids 5 more near-identical
+diffs later). Reduced motion shows the title instantly, no clip. Unit tests:
+`src/scenes/ChapterTitle.test.tsx` (hidden-while-inactive, armed-on-entry, reduced-motion-instant,
+re-clips-on-exit-for-replay).
+
+**Chapter 1 content:** `src/scenes/LegendPlate.tsx` -- ART_DIRECTION.md section 3's "only other
+element besides the full-bleed network" (cols 1-4 desktop / cols 1-5 tablet, both bottom-anchored 24px
+from the viewport bottom per `grid.legendPlate` in `DESIGN_SYSTEM.json`; mobile moves it to the top,
+below the FIG index strip, full width minus margins). Houses the chapter title (via `ChapterTitle`)
+and 3 rows of REAL figures read directly from `state.network`/`state.baseline.result` (bus/line
+counts, served-of-total MW, solver status) -- nothing fabricated, nothing animated as a count-up.
+Always mounted, shown via `inert`+opacity exactly like FigIndex/ResetButton/SkipIntro, driven directly
+by `active==='ch1'`. An earlier version placed the title/prose as a SEPARATE floating block outside
+the plate; a real screenshot showed it visually colliding with the network's own bus-14 label, so it
+was folded into the plate itself, matching the spec's "only other element" wording more literally and
+fixing the collision in one move.
+
+Chapter 1's own motion-sheet row ("fault heals to baseline... reduce replays fault") needed no new
+code: `IntroSequence`'s existing convergence branch already reverts `introFaultActive` to false and
+clears all intro-only opacity/filter work the instant `active!=='intro'`, and `App.tsx`'s own
+story/lab switch already has no override branch for `ch1` (falls through to `state.baseline.result`
+unconditionally) -- so chapter 1 was already analytically and visually correct the moment the
+background bug was fixed; the only genuinely new motion is the title reveal above.
+
+**Verified:** entry, reverse-scroll, instant FIG-index jump (from chapter 6, skipping every
+intermediate chapter), reduced motion, and analytical-state preservation (scrolling through chapter 1
+alone creates zero solver Workers) -- `e2e/chapter1.spec.ts`, 6 new tests. Real screenshots at all 3
+required breakpoints plus reduced motion, read and inspected (not just generated) before calling this
+chapter done: `verification/SCREENSHOTS/ch1-desktop-1440x900.png`, `ch1-tablet-768x1024.png`,
+`ch1-mobile-390x844.png`, `ch1-reduced-motion.png`. Tablet/mobile currently reuse the SAME landscape
+network layout coordinates, scaled down (not a true portrait-specific re-projection per
+ART_DIRECTION's responsive table) -- this is the SAME pre-existing, already-tracked gap noted in the
+prior milestone (`orientation="portrait"` exists on NetworkView but isn't wired into the chapter
+shell), not new to chapter 1, and not fixed here; still open for a dedicated responsive pass.
+
+Test counts: 56/56 vitest (+4: ChapterTitle), 64/64 e2e (+6: chapter1.spec.ts), 32/32 pytest, clean
+build.
+
 ## Resume point if this session ends mid-chapter-work
 
 Check `git log --oneline -10` for the most recent commit, and re-read this file plus
 `docs/planning/cascadia/CHAPTER_ARCHITECTURE.md` and `docs/ART_DIRECTION.md` section 4 (storyboard/motion
-table) by then. The shared GSAP lifecycle layer and the FULL intro sequence (beats 1-4, Skip, chrome
-reveal) are built, verified, and committed -- this is the pattern every subsequent scene should follow
-(`useScene`, not raw `useGSAP`/`ScrollTrigger`; one continuous timeline per scene, killed at the top of
-every `setup()` call, not left to the scope-revert mechanism alone). Continue with chapter 1's own
-choreography, then chapters 2-6 in order, each verified (vitest + real-browser e2e + real screenshots,
-read by a reviewer genuinely independent of whoever built the feature, per this project's mandatory
-visual-QA rule) and committed before moving to the next, per the "CINEMATIC ORCHESTRATION" directive's
-phase 7-8.
+table) by then. The shared GSAP lifecycle layer, the FULL intro sequence (beats 1-4, Skip, chrome
+reveal), the shared `ChapterTitle` masked-reveal primitive, and chapter 1 ("Grid formation") are built,
+verified, and committed -- this is the pattern every subsequent scene should follow (`useScene`, not raw
+`useGSAP`/`ScrollTrigger`; one continuous timeline per scene, killed at the top of every `setup()` call,
+not left to the scope-revert mechanism alone; `ChapterTitle` reused as-is, not reinvented per chapter).
+
+**Before building chapter 2's camera scrub**, re-verify the `.chapter-section` background-transparency
+fix hasn't been quietly reintroduced somewhere, and remember the lesson that caused it to be found:
+take and READ a real (non-`fullPage`) screenshot at the chapter's actual scroll position before trusting
+anything about a chapter's visual state, never a full-page capture alone.
+
+Continue with chapter 2 ("demand and generation": editorial split, prose-led, scroll-scrubbed camera
+pan into cols 6-12 at ~60% scale plus a generation/demand balance-rule morph), then chapters 3-6 in
+order, each verified (vitest + real-browser e2e + real screenshots at all 3 breakpoints + reduced
+motion, actually read, not just generated) and committed before moving to the next. After chapter 6:
+production frame-pacing measurement against ART_DIRECTION.md section 4's kill criteria (chapter 4
+fracture + a lab node removal, glow on; p95 <=16.7ms desktop, <=33.3ms mobile/throttled), then an
+independent adversarial review in an isolated worktree per the directive's phase 6, then final release
+readiness per phase 8. Do not claim performance compliance or final acceptance without that evidence.
