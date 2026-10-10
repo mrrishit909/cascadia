@@ -1146,18 +1146,39 @@ judged sufficient given its narrow, precisely-measured scope (a single CSS prope
 not a new class of defect) and its own real reproduce-before-fix confirmation, rather than spawning
 indefinite further review rounds.
 
-## Resume point: finalization in progress
+**Sixth remediation pass**: a second advisor review of the finalization RECORD itself (not just the
+app) caught the chapter 6 rail's `top:44px` nav-offset being a stale guess (real bar height 56px, 12px
+of the network was hidden under the nav bar at narrow widths -- fixed) and, more significantly, that
+the Lighthouse "investigation" in the LIGHTHOUSE_REPORT.md was never real: the audit IDs it checked
+(`render-blocking-resources`, `critical-request-chains`) don't exist in Lighthouse 13, so the lookups
+silently failed and the report's "nothing render-blocking" claim was unverified. Re-run correctly
+against this version's real `*-insight` audit IDs, `render-blocking-insight` flagged the app's one CSS
+bundle as genuinely render-blocking (~750ms estimated LCP cost) -- fixed by inlining it into
+`index.html` at build time (`vite.config.ts`). Re-measured Lighthouse at 3 mobile runs: median LCP
+2.415s, clear of the 2.5s gate (previously 2.567s, a real miss). Also ran `npm run lint` for the first
+time this session (0 errors, 28 pre-existing warnings, not touched), tightened the nav-overflow test
+back to an exact bound (was loosened, and the "fixed" state wasn't reflected in PROGRESS.md or
+LIMITATIONS.md -- corrected), refreshed the committed screenshot evidence set (18 files, all 6
+chapters x 3 breakpoints, at this final commit) plus added a full intro-to-ch6 scroll recording, and
+updated `CAS-MOTION-001` in REQUIREMENTS.yaml to `independently verified`. A final SCOPED fresh-worktree
+review (narrower than the full reviews above, targeted at just the CSS-inlining and nav-offset fixes)
+found no further defects.
 
-Check `git log --oneline -15` for the most recent commit. All 6 chapters are built and committed.
-Finalization phases 1 (performance, including Lighthouse), 2 (independent review + five remediation
-passes, the fourth of which was independently reverified in a fresh worktree), and 3 (documentation)
-are now complete and committed. Remaining: phase 4's own final integration gate checklist (oracle
-parity check, a consolidated responsive-screenshot set, concurrency/reset regressions -- these have
-each been exercised individually across the remediation passes above but not yet re-run as one single
-consolidated final pass) and phase 5 (the final acceptance report,
-`verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`, plus `CASCADIA_FINAL_HANDOFF.md`). The known,
-accepted, honestly-documented gaps going into that report: mobile LCP's measured miss against the gate
-(LIMITATIONS.md -- re-measurement with a 3-run median still pending as of this update), chapter 6's
-rail having zero page-scroll sticky range (LIMITATIONS.md, positioning semantics only, not
-reachability), and no deployment (never authorized). The nav-strip overflow is FIXED, not an accepted
-gap (see above).
+**Final acceptance report written**: `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md` (conclusion:
+ACCEPTED as a release candidate, with deployment and its 3 portfolio-gate rows explicitly carved out as
+not evidenced rather than passed) and `verification/CASCADIA_FINAL_HANDOFF.md` (short practical
+resume/deploy reference), both at commit `594d63c`, both built from a fresh full suite run at that
+exact commit (tsc clean, lint 0 errors, Vitest 61/61, pytest 32/32, Playwright 123/123 incl. axe-core
+6/6 zero violations) rather than numbers carried over from earlier in the session.
+
+## Resume point: finalization COMPLETE
+
+CASCADIA's finalization directive is done. Read `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`
+first for the full picture; `verification/CASCADIA_FINAL_HANDOFF.md` for the short "what next"
+reference (deployment steps, what was explicitly out of scope). The only remaining gate item
+(`CAS-RELEASE-001`, deployment) requires explicit authorization not given this session -- do not deploy
+without it. If resuming CSS/chrome work on chapter 6 or the intro/nav area specifically, read this
+file's own remediation history above first (§ the five-then-sixth passes) -- several non-obvious CSS
+interactions were found there the hard way (double-padding stacking across `main`/`.chapter-section`,
+`position:fixed` escaping its intended containing block, a sticky range that's zero by construction
+when a flex item's own height already equals its container's content box).
