@@ -48,7 +48,11 @@ test("only one bus/line is a Tab stop; Arrow keys move it along topology neighbo
     return el ? { testid: el.getAttribute("data-testid"), line: el.getAttribute("data-line") } : null;
   });
   expect(focusedAfter?.testid).toBe("line");
-  const network = await page.evaluate(async () => (await fetch("/data/raw-metadata/case30.json")).json()) as { lines: { idx: number; from_bus: number; to_bus: number }[] };
+  // A hardcoded absolute path here (not import.meta.env.BASE_URL-aware, unlike the real app code in
+  // useFixture.ts/state.tsx) broke the instant `base: '/cascadia/'` was set in vite.config.ts for the
+  // GitHub Pages deploy -- found by the full suite, not assumed safe. `new URL(..., location.href)`
+  // resolves relative to the page's own current base, same as the app's own fetches do.
+  const network = await page.evaluate(async () => (await fetch(new URL("data/raw-metadata/case30.json", location.href))).json()) as { lines: { idx: number; from_bus: number; to_bus: number }[] };
   const focusedLine = network.lines.find(l => String(l.idx) === focusedAfter?.line);
   expect(focusedLine && (focusedLine.from_bus === 5 || focusedLine.to_bus === 5)).toBe(true);
 });

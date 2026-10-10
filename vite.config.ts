@@ -29,6 +29,13 @@ function inlineCss(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
+  // GitHub Pages project page (DEPLOYMENT.md): served at mrrishit909.github.io/cascadia/, matching
+  // this account's other project repos (cascade, rift, nexus-infrastructure-map), never a root-domain
+  // deploy. Every asset reference in this codebase already goes through either Vite's own
+  // import.meta.url (new Worker(...), wasm) or import.meta.env.BASE_URL (data fetches in
+  // useFixture.ts/state.tsx), both of which automatically respect this, so no other path needed
+  // changing to support it.
+  base: '/cascadia/',
   plugins: [react(), inlineCss()],
   test: {
     environment: 'jsdom',
