@@ -1171,14 +1171,47 @@ resume/deploy reference), both at commit `594d63c`, both built from a fresh full
 exact commit (tsc clean, lint 0 errors, Vitest 61/61, pytest 32/32, Playwright 123/123 incl. axe-core
 6/6 zero violations) rather than numbers carried over from earlier in the session.
 
-## Resume point: finalization COMPLETE
+## Deployment, live verification, and portfolio integration (2026-10-10)
 
-CASCADIA's finalization directive is done. Read `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md`
-first for the full picture; `verification/CASCADIA_FINAL_HANDOFF.md` for the short "what next"
-reference (deployment steps, what was explicitly out of scope). The only remaining gate item
-(`CAS-RELEASE-001`, deployment) requires explicit authorization not given this session -- do not deploy
-without it. If resuming CSS/chrome work on chapter 6 or the intro/nav area specifically, read this
-file's own remediation history above first (§ the five-then-sixth passes) -- several non-obvious CSS
+Under explicit user authorization ("CASCADIA -- FINAL DEPLOYMENT, LIVE VERIFICATION & PORTFOLIO
+INTEGRATION"), tagged the accepted release candidate (`release-candidate-594d63c`), set
+`vite.config.ts`'s `base` to `/cascadia/`, fixed a stale `<title>frontend</title>` and a base-path-
+unaware e2e test (`e2e/networkRovingTabindex.spec.ts` had a hardcoded absolute fetch path), added an
+`inlineCss` Vite plugin (fixed a real Lighthouse render-blocking-CSS finding), pushed to the new public
+repo `https://github.com/mrrishit909/cascadia`, and added `.github/workflows/deploy.yml` (GitHub
+Actions, `actions/deploy-pages`). First CI run failed every Vitest worker (jsdom 30's undici needs Node
+24, workflow was pinned to 20); fixed by matching Node versions.
+
+Verified the LIVE public URL (not just the Actions run) with real Playwright sessions: 15/15 checklist
+PASS, zero console/page errors, zero 404s, across desktop/tablet/mobile. Lighthouse against the live
+URL: desktop 100/100/0.4s LCP/0 CLS, mobile 100/100/1.5s LCP/0 CLS, both with wide margin. Details in
+`verification/LIVE_VERIFICATION/LIVE_VERIFICATION_REPORT.md`.
+
+Added a portfolio case study at `~/projects-site/cascadia/` (order 200, the current highest), following
+that site's own `build.py` schema exactly, using only facts verified in this session, no fabricated
+numbers. Verified end to end via the portfolio's own search UI and sleeve-modal interaction:
+`https://mrrishit909.github.io/projects/cascadia/`, linking to both the live demo and the GitHub repo.
+
+A second, fully independent reviewer with public-URL-only access (no local repo) separately confirmed
+the live app's solver, the restoration comparison, the portfolio link, the case study's accuracy, the
+GitHub repo, and that the deployed build matches `main` HEAD via the GitHub API. Verdict: CONFIRMED
+WORKING on all six checks, no publication-blocking findings. One non-blocking disclosure note: this
+repo's `.claude`/`.codex`/agent-tooling files are publicly visible in the GitHub tree, a presentation
+choice for the project owner, not a defect. Full findings:
+`verification/LIVE_VERIFICATION/INDEPENDENT_PUBLICATION_REVIEW.md`.
+
+`specifications/REQUIREMENTS.yaml`'s `CAS-RELEASE-001` updated to `independently verified`. Final
+consolidated record: `verification/CASCADIA_PUBLICATION_REPORT.md`.
+
+## Resume point: finalization AND publication COMPLETE
+
+CASCADIA is built, accepted, deployed, and independently verified end to end. Read
+`verification/CASCADIA_PUBLICATION_REPORT.md` for the single consolidated publication record (URLs,
+commits, workflow, live smoke-test and Lighthouse results, independent findings, remaining
+limitations); `verification/CASCADIA_FINAL_ACCEPTANCE_REPORT.md` for the release-candidate evaluation
+that preceded it; `verification/CASCADIA_FINAL_HANDOFF.md` for the short practical reference. No gate
+item remains open. If resuming CSS/chrome work on chapter 6 or the intro/nav area specifically, read
+this file's own remediation history above first (the five-then-sixth passes) -- several non-obvious CSS
 interactions were found there the hard way (double-padding stacking across `main`/`.chapter-section`,
 `position:fixed` escaping its intended containing block, a sticky range that's zero by construction
 when a flex item's own height already equals its container's content box).

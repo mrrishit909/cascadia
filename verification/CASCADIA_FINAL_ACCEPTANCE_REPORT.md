@@ -173,36 +173,53 @@ visually inspected during this session, not just captured and trusted.
   not reachability, see §4).
 - Testing-tool constraints (not app gaps): synthetic touch-drag and native `<select>` keyboard
   limitations in headless Chromium, both worked around with equivalent real-keyboard coverage.
-- **Not deployed.** No external publish has been performed; `DEPLOYMENT.md` documents the exact steps
-  (base path, build, verify, curl, screenshot) for whoever is authorized to complete it.
+- **Now deployed and independently verified** (updated 2026-10-10, see below). The one previously
+  open item in this section has been closed.
 
-## 8. Deployment readiness
+## 8. Deployment readiness (updated 2026-10-10)
 
-`CAS-RELEASE-001` remains `unstarted`. The production build is verified clean and is the exact build
-every test in this report ran against. `vite.config.ts`'s `base` option is deliberately unset pending a
-real target-path decision, documented in `DEPLOYMENT.md`. No deployment or external publish has been
-performed this session, per this project's own standing rule requiring explicit authorization, which
-has not been given.
+`CAS-RELEASE-001` is now `independently verified`. Under explicit user authorization ("CASCADIA --
+FINAL DEPLOYMENT, LIVE VERIFICATION & PORTFOLIO INTEGRATION"), the release-candidate commit `594d63c`
+evaluated by this report was tagged (`release-candidate-594d63c`) and preserved, then `vite.config.ts`'s
+`base` was set to `/cascadia/`, the repo was pushed to the public `https://github.com/mrrishit909/cascadia`,
+and a GitHub Actions workflow (`.github/workflows/deploy.yml`) deployed it to
+`https://mrrishit909.github.io/cascadia/`.
 
-## 9. Conclusion
+The live site, not just the Actions run, was verified with real Playwright browser sessions against
+the actual public URL: all 6 chapters render, a real control triggers the real browser-side WASM
+solver and the UI state changes correctly, reverse navigation and roving-tabindex keyboard nav work,
+zero console/page errors, zero failed asset requests, Worker + WASM load (200). Lighthouse against the
+live URL: desktop Performance 100/Accessibility 100/LCP 0.4s/CLS 0, mobile Performance 100/Accessibility
+100/LCP 1.5s/CLS 0, both with wide margin over the gate. Full checklist and raw reports:
+`verification/LIVE_VERIFICATION/LIVE_VERIFICATION_REPORT.md`.
 
-**ACCEPTED** as a release candidate, with the deployment row (`CAS-RELEASE-001`) and its 3 gate rows
-(Deployment, GitHub repo publication, Portfolio case-study page) explicitly carved out as **not
-evidenced** rather than passed, those require actions (authorization, a real GitHub push, portfolio
-integration) outside this session's scope and this project's own standing rule against unauthorized
-external publishing.
+A second, fully independent reviewer with public-URL-only access (no local repo) separately confirmed
+the live app's solver (two different bus removals producing independently different LP outputs), the
+portfolio home page and search, the case-study page's accuracy and working links, the GitHub repo's
+content, and that the deployed build matches the current `main` HEAD via the GitHub API. No
+publication-blocking findings. Full findings: `verification/LIVE_VERIFICATION/INDEPENDENT_PUBLICATION_REVIEW.md`.
 
-Within that carve-out, every other requirement in `specifications/REQUIREMENTS.yaml` is either
-`implemented` or `independently verified` with cited evidence; the full test suite (tsc, lint, Vitest,
-pytest, Playwright, axe-core) is green at this exact commit; mathematical correctness is independently
-re-derived and verified; the motion/visual work has been through two full independent adversarial
-review passes plus a final scoped confirmation, with every finding fixed and re-verified before this
-report was written; performance (both frame-pacing and Lighthouse, including the accessibility and
-Core Web Vitals gates) passes on its stated primary target (mobile) and with wide margin on desktop;
-and every known limitation, including two documented mid-session corrections to this project's own
-record (an unverified Lighthouse investigation claim, an overstated "brief/transient" visual defect),
-is disclosed honestly in `LIMITATIONS.md` rather than hidden or rounded away.
+A portfolio case study was added at `https://mrrishit909.github.io/projects/cascadia/`, in the existing
+portfolio's own card/case-study format, linking to both the live demo and the GitHub repo, both links
+independently confirmed working.
 
-Next step for deployment: set `vite.config.ts`'s `base` to the real target path, rebuild, verify with
-`npm run preview`, obtain explicit authorization to publish, deploy, then `curl` the live URL and
-screenshot it per `DEPLOYMENT.md`'s own checklist, none of which this report performs.
+## 9. Conclusion (updated 2026-10-10)
+
+**ACCEPTED, and now also published.** Deployment, GitHub repository publication, and portfolio
+integration, previously carved out as not evidenced, are now complete and independently verified; see
+`verification/CASCADIA_PUBLICATION_REPORT.md` for the full publication record (live URLs, deployment
+commit, workflow, live smoke-test results, Lighthouse results, and the independent reviewer's findings).
+
+Every requirement in `specifications/REQUIREMENTS.yaml` is now either `implemented` or `independently
+verified` with cited evidence; the full test suite (tsc, lint, Vitest, pytest, Playwright, axe-core) is
+green at the evaluated commit; mathematical correctness is independently re-derived and verified; the
+motion/visual work has been through two full independent adversarial review passes plus a final scoped
+confirmation; performance (frame-pacing and Lighthouse, both local and now live) passes with wide
+margin; and every known limitation, including the ones already on record and the one non-blocking
+disclosure note the publication reviewer raised (this repo's `.claude`/`.codex`/agent-tooling files are
+publicly visible in the GitHub tree, a presentation choice for the project owner, not a defect), is
+disclosed honestly in `LIMITATIONS.md` / the publication report rather than hidden or rounded away.
+
+No further action is required to consider CASCADIA shipped. Optional follow-ups (not blocking): build
+the portfolio motion tile once `ffmpeg`/global `playwright` are available locally, and decide whether to
+gitignore the repo's internal agent-tooling files for presentation purposes.
