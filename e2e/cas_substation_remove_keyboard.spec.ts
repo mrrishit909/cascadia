@@ -8,7 +8,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "..");
 
 // CAS-INT-001 keyboard-only: no pointer/mouse calls anywhere in this file.
-test("remove a substation by keyboard; unserved MW equals sweep total_shed", async ({ page }) => {
+test("remove a substation by keyboard; unserved MW equals sweep total_shed", async ({ page, browserName }) => {
+  // macOS WebKit never Tabs to buttons (the OS "keyboard navigation" setting, off by default), so
+  // the Tab-to-Confirm step can't run there; Linux WebKit (CI) and every other engine run it.
+  test.skip(browserName === "webkit" && process.platform === "darwin", "macOS WebKit does not Tab to buttons");
   const sweep = JSON.parse(fs.readFileSync(path.join(ROOT, "verification/REFERENCE_RESULTS/n1_sweep.json"), "utf8"));
   const c = sweep.cases.find((x: any) => x.scenario?.removed_buses?.length === 1 && x.status === "optimal" && x.total_shed > 0);
   expect(c, "sweep has a bus removal with nonzero shed").toBeTruthy();
@@ -38,5 +41,7 @@ test("remove a substation by keyboard; unserved MW equals sweep total_shed", asy
   await page.keyboard.press("Enter");
 
   await expect(home(page).getByTestId("unserved-mw")).toHaveText(expected);
-  await page.screenshot({ path: path.join(ROOT, "verification/SCREENSHOTS", "cas-int-001-keyboard-remove.png"), fullPage: true });
+  // The committed evidence is Chromium's; other engines keep their screenshot in test-results.
+  const dir = test.info().project.name === "chromium" ? path.join(ROOT, "verification/SCREENSHOTS") : test.info().outputDir;
+  await page.screenshot({ path: path.join(dir, "cas-int-001-keyboard-remove.png"), fullPage: true });
 });
