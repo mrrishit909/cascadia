@@ -1,43 +1,117 @@
-name: Deploy to GitHub Pages
+name: CI and Pages deploy
 
+# Every check runs on pushes to main and on pull requests; only a push to main deploys, and only
+# after every check job has passed (deploy `needs:` all of them).
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch: {}
 
+# Least privilege: every job can only read the repo. The deploy job alone gets Pages write and an
+# OIDC token; no job here uses secrets.
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  build:
+  checks:
+    name: Typecheck, lint, unit + TS/Python parity tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           # jsdom 30's bundled undici uses a webidl API (markAsUncloneable) that doesn't exist on
           # Node 20 -- "TypeError: webidl.util.markAsUncloneable is not a function" killed every
-          # Vitest worker in the first CI run. Matched to this project's own locally-developed-against
-          # Node version (24.x) instead of guessing a round number.
+          # Vitest worker in the first CI run. Matched to the locally-developed-against Node (24.x).
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npm run test -- --run
+      - run: npx tsc -b
+      - run: npx oxlint
+      # Includes tests/unit/*Parity.test.ts: the browser LP solver against the Python oracle's
+      # committed reference results.
+      - run: npx vitest run
+
+  python:
+    name: Python oracle (pytest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      # uv.lock pins every package; --frozen refuses to run if it is out of date with pyproject.toml.
+      - run: uv sync --frozen --python 3.13
+      - run: uv run --frozen pytest -q
+
+  e2e:
+    name: Playwright + axe-core (${{ matrix.browser }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps ${{ matrix.browser }}
+      # playwright.config.ts builds production and serves it itself (never a dev server).
+      - run: npx playwright test --project=${{ matrix.browser }}
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ matrix.browser }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+
+  build:
+    name: Production build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
       - run: npm run build
-      - uses: actions/upload-pages-artifact@v3
+      - if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
   deploy:
-    needs: build
+    name: Deploy to GitHub Pages
+    needs: [checks, python, e2e, build]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

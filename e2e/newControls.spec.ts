@@ -148,15 +148,19 @@ test("D1: AlterCapacity's debounced request fires while the load solve is genuin
   // rather than depending on keystroke timing.
   await withWasmDelay(page, 1500);
   await page.goto("/");
-  await controlHome(page, "Alter line capacity").locator('select').selectOption({ index: 10 }); // line 9
-  const capSlider = home(page).getByRole("slider");
-  await capSlider.focus();
-  await page.keyboard.press("ArrowLeft"); // 1.00x -> 0.95x, debounce timer armed, NOT yet sent to the Worker
+  // Load is staged first and the capacity keystroke comes LAST, immediately before Apply load, so the
+  // 250ms debounce always elapses after Apply. In the original order (capacity first, then a select
+  // and 12 keystrokes) WebKit and Firefox sometimes spent >250ms on the keystrokes, the capacity
+  // request went out before Apply, and the final provenance read the load label instead.
   await controlHome(page, "Increase load").locator('select').selectOption({ index: 5 }); // bus 7
   const loadSlider = controlHome(page, "Increase load").locator('input[type=range]');
   await loadSlider.focus();
   for (let i = 0; i < 12; i++) await page.keyboard.press("ArrowRight"); // 1x -> 4x
   await expect(home(page).getByTestId("load-factor")).toHaveText("4.00x");
+  await controlHome(page, "Alter line capacity").locator('select').selectOption({ index: 10 }); // line 9
+  const capSlider = controlHome(page, "Alter line capacity").locator("input[type=range]");
+  await capSlider.focus();
+  await page.keyboard.press("ArrowLeft"); // 1.00x -> 0.95x, debounce timer armed, NOT yet sent to the Worker
   await home(page).getByRole("button", { name: "Apply load" }).click(); // fires well inside the 250ms debounce window
   // solver-derived: both the capacity change (read from the engine's own line_rating_mw via the line's
   // aria-label) and the load change must land in the SAME final combined result, matching the oracle's
