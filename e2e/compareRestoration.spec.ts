@@ -61,6 +61,11 @@ test("isolation: Compare's own request does not hang an unrelated control's in-f
   await home(page).getByRole("button", { name: "Confirm removal" }).focus();
   await page.keyboard.press("Enter"); // removal solve in flight (~1.5s, shared Worker's first solve)
   await home(page).getByRole("button", { name: "Compare" }).click(); // Compare's own private Worker also loads its own WASM now
+  // Clicking Compare scrolls to its own chapter (5), and the shared stage then shows chapter 5's
+  // state, so the removal is checked back on chapter 4. Asserting it right after the click raced the
+  // chapter switch: it passed in Chromium only when the check landed first, and failed every time in
+  // Firefox/WebKit (measured: the stage reads "served" on chapter 5, "removed" back on chapter 4).
+  await scrollToChapter(page, "ch4");
   await expect(page.locator('[data-testid="bus"][data-bus="26"]')).toHaveAttribute("data-state", "removed", { timeout: 10000 });
   await expect(page.getByText(/Solving/)).toHaveCount(0, { timeout: 10000 });
   await expect(home(page).getByTestId("cr-n-orders")).toHaveText("6", { timeout: 10000 });

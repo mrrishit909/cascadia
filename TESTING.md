@@ -1,9 +1,20 @@
 # Testing
 
 Current counts (full suite, last verified fresh before this document was written): **61/61 Vitest,
-112/112 Playwright, 32/32 pytest**, clean production build. Every number in this document is
+123/123 Playwright per engine (369 across Chromium/Firefox/WebKit), 32/32 pytest**, clean production build. Every number in this document is
 reproducible by actually running the commands below -- none of it is asserted without having just run
 it.
+
+**2026-10-11 update (CI hardening):** Playwright now has Chromium, Firefox and WebKit projects
+(`--project=<name>`); the suite is 123 tests per engine, 369 in all, and CI runs each engine as its
+own job (all 123/123 on Linux, run 38123008389). Two tests were made engine-independent after
+Firefox/WebKit exposed timing assumptions (not app bugs): Compare's isolation test now checks the
+removal back on chapter 4 (the Compare click scrolls the shared stage to chapter 5), and the D1
+debounce test stages the capacity keystroke last so the 250ms debounce always elapses after Apply.
+Local macOS caveat: Playwright's WebKit on macOS does not Tab to buttons (an OS keyboard-navigation
+setting), so `cas_substation_remove_keyboard.spec.ts` skips in WebKit on macOS only; Linux CI runs it
+in all three engines. Its evidence screenshot is written to `verification/SCREENSHOTS/` by Chromium
+only (other engines write to `test-results/`). Use `PW_PORT=<port>` to run the preview on a port other than 4173.
 
 ## Why three suites
 
